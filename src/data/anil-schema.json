@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "generatedAt": "2026-08-28T01:32:28.725Z",
+  "counts": {
+    "pokemon": 1027,
+    "moves": 851,
+    "abilities": 328,
+    "items": 887
+  }
+}

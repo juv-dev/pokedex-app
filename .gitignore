@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.output/
+coverage/
+*.log
+.DS_Store
+.env
+.env.*
+*.min.js
+*.min.css
+*.tsbuildinfo
+.claude/
+.claudeignore
+CLAUDE.md
+# Local AI runtime state
+.atl/
+.hud-ref/
