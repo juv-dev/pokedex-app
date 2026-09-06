@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import type { DexNode, TemplateCardVM, TemplateGameData } from '../../lib/types'
 import { NATURE_TABLE } from '../../lib/constants'
 import { getAnilSpecies } from '../../lib/anilData'
@@ -35,13 +35,7 @@ const emit = defineEmits<{
   (e: 'next'): void
 }>()
 
-const plan = ref<'opt' | 'via'>('opt')
-watch(() => props.cards, () => { plan.value = 'opt' })
-
-const activeCard = computed<TemplateCardVM | null>(() => {
-  if (!props.cards.length) return null
-  return plan.value === 'opt' ? props.cards[0] : props.cards[1] ?? props.cards[0]
-})
+const activeCard = computed<TemplateCardVM | null>(() => props.cards[0] ?? null)
 
 const baseStatsArr = computed(() => [
   props.node.stats.hp, props.node.stats.attack, props.node.stats.defense,
@@ -57,11 +51,8 @@ const natureRow = computed(() =>
 const raisesIdx = computed(() => (natureRow.value?.raises ? NATURE_STAT_IDX[natureRow.value.raises] ?? null : null))
 const lowersIdx = computed(() => (natureRow.value?.lowers ? NATURE_STAT_IDX[natureRow.value.lowers] ?? null : null))
 
-const recommendedEvs = computed(() => activeCard.value?.evs ?? [0, 0, 0, 0, 0, 0])
-const statEvs = computed(() =>
-  props.context === 'save' && props.saveEvs && props.saveEvs.length ? props.saveEvs : recommendedEvs.value
-)
-const statIvs = computed(() => (props.saveIvs && props.saveIvs.length ? props.saveIvs : [31, 31, 31, 31, 31, 31]))
+const statEvs = computed(() => activeCard.value?.evs ?? props.saveEvs ?? [0, 0, 0, 0, 0, 0])
+const statIvs = computed(() => activeCard.value?.ivs ?? props.saveIvs ?? [31, 31, 31, 31, 31, 31])
 
 const hasMegas = computed(() => props.nodes.some(n => n.stageKind === 'mega'))
 
@@ -75,7 +66,7 @@ const evoInfo = computed(() => {
 })
 const lastCrumb = computed(() => props.crumbs[props.crumbs.length - 1] ?? '')
 const headCrumbs = computed(() => props.crumbs.slice(0, -1))
-const showNav = computed(() => props.context === 'dex' && (props.prevAvailable || props.nextAvailable))
+const showNav = computed(() => props.prevAvailable || props.nextAvailable)
 </script>
 
 <template>
@@ -85,19 +76,30 @@ const showNav = computed(() => props.context === 'dex' && (props.prevAvailable |
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M15 18l-6-6 6-6" />
         </svg>
+        <span v-if="context === 'save'" class="sheet-back-label">Volver a Vista del equipo</span>
         <span v-for="(c, i) in headCrumbs" :key="i" class="sheet-crumb">{{ c }}<span class="sheet-crumb-sep">/</span></span>
         <span class="sheet-crumb sheet-crumb-cur">{{ lastCrumb }}</span>
       </button>
+      <div v-if="showNav" class="sheet-nav">
+        <button type="button" class="sheet-nav-btn" :disabled="!prevAvailable" @click="emit('prev')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          Anterior
+        </button>
+        <button type="button" class="sheet-nav-btn" :disabled="!nextAvailable" @click="emit('next')">
+          Siguiente
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
+        </button>
+      </div>
     </div>
 
     <div class="sheet-grid">
       <div class="sheet-row-top">
         <PokemonSummary :node="node" />
-        <CompetitivePanel :cards="cards" :base-stats="baseStatsArr" :evo-info="evoInfo" v-model:plan="plan" />
+        <CompetitivePanel :cards="cards" :base-stats="baseStatsArr" :evo-info="evoInfo" />
       </div>
 
       <div class="sheet-row-lower" :class="hasMegas ? 'has-mega' : ''">
-        <GeneralInfo v-if="context === 'dex'" :node="node" />
+        <GeneralInfo :node="node" />
         <StatBlock
           :base-stats="baseStatsArr"
           :evs="statEvs"
@@ -113,17 +115,6 @@ const showNav = computed(() => props.context === 'dex' && (props.prevAvailable |
           <MegaEvolution v-if="hasMegas" :nodes="nodes" :active-idx="idx" @select="i => emit('form-select', i)" />
         </div>
       </div>
-    </div>
-
-    <div v-if="showNav" class="sheet-nav">
-      <button type="button" class="sheet-nav-btn" :disabled="!prevAvailable" @click="emit('prev')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-        Anterior
-      </button>
-      <button type="button" class="sheet-nav-btn" :disabled="!nextAvailable" @click="emit('next')">
-        Siguiente
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6" /></svg>
-      </button>
     </div>
   </div>
 </template>

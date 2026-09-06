@@ -157,22 +157,23 @@ export function getAnilItemName(internalName: string): string {
   return itemNames[internalName] || internalName
 }
 export function getAnilAbilityName(internalName: string): string {
-  return abilityNames[internalName] || internalName
+  const key = internalName.trim()
+  return abilityNames[key] || key
 }
 /** Estricta: devuelve `null` cuando el id no existe, para poder probar existencia real. */
 export function lookupAnilAbilityName(internalName: string): string | null {
-  return abilityDetails[internalName]?.name ?? null
+  return abilityDetails[internalName.trim()]?.name ?? null
 }
 /** Detalle completo de la habilidad (nombre, descripción en español, flags) o `null` si no existe. */
 export function getAnilAbilityDetail(internalName: string): AnilAbilityDetail | null {
-  return abilityDetails[internalName] ?? null
+  return abilityDetails[internalName.trim()] ?? null
 }
 /** Estricta: devuelve `null` cuando el id no existe, para poder probar existencia real. */
 export function lookupAnilItemName(internalName: string): string | null {
   return itemDetails[internalName]?.name ?? null
 }
 export function getAnilAbilityNumber(internalName: string): number | null {
-  return abilityNumbers[internalName] ?? null
+  return abilityNumbers[internalName.trim()] ?? null
 }
 export function getAnilItemNumber(internalName: string): number | null {
   return itemNumbers[internalName] ?? null

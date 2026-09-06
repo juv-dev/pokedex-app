@@ -16,38 +16,43 @@ function card(p: Partial<TemplateCardVM>): TemplateCardVM {
 const baseStats = [80, 82, 83, 100, 100, 80]
 
 describe('CompetitivePanel', () => {
-  it('should show the competitive tier badge', () => {
-    expect(mount(CompetitivePanel, { props: { cards: [card({})], baseStats, plan: 'opt' } }).get('.sheet-comp-badge').text()).toContain('ÓPTIMO')
-    const viable = mount(CompetitivePanel, { props: { cards: [card({ tier: 'viable', tierLabel: 'Viable' })], baseStats, plan: 'via' } })
-    expect(viable.get('.sheet-comp-badge').text()).toContain('VIABLE')
+  it('should badge a curated set as ÓPTIMO', () => {
+    const wrapper = mount(CompetitivePanel, { props: { cards: [card({})], baseStats } })
+    expect(wrapper.get('.sheet-comp-badge').text()).toContain('ÓPTIMO')
   })
 
-  it('should always render the Óptimo/Viable selector', () => {
-    expect(mount(CompetitivePanel, { props: { cards: [card({})], baseStats, plan: 'opt' } }).find('.sheet-plan').exists()).toBe(true)
-    expect(mount(CompetitivePanel, { props: { cards: [card({}), card({ tier: 'viable' })], baseStats, plan: 'opt' } }).find('.sheet-plan').exists()).toBe(true)
+  it('should badge any non-optimo set as VIABLE', () => {
+    for (const tier of ['viable', 'auto', 'pendiente'] as const) {
+      const wrapper = mount(CompetitivePanel, { props: { cards: [card({ tier })], baseStats } })
+      expect(wrapper.get('.sheet-comp-badge').text()).toContain('VIABLE')
+    }
+  })
+
+  it('should not render an Óptimo/Viable selector', () => {
+    expect(mount(CompetitivePanel, { props: { cards: [card({})], baseStats } }).find('.sheet-plan').exists()).toBe(false)
   })
 
   it('should show nature, item and ability with their identifier number', () => {
-    const text = mount(CompetitivePanel, { props: { cards: [card({})], baseStats, plan: 'opt' } }).text()
+    const text = mount(CompetitivePanel, { props: { cards: [card({})], baseStats } }).text()
     expect(text).toContain('Osada · n.º 5')
     expect(text).toContain('Lodo Negro · n.º 116')
     expect(text).toContain('Espesura · n.º 65')
   })
 
-  it('should read the active template from the plan prop', () => {
+  it('should read the recommended set from the first card', () => {
     const wrapper = mount(CompetitivePanel, {
-      props: { cards: [card({}), card({ natureDisplay: 'Miedosa (n.º 22)' })], baseStats, plan: 'via' }
+      props: { cards: [card({ natureDisplay: 'Miedosa (n.º 22)' }), card({ natureDisplay: 'Osada (n.º 5)' })], baseStats }
     })
     expect(wrapper.text()).toContain('Miedosa · n.º 22')
   })
 
   it('should render four quick-stat boxes', () => {
-    const wrapper = mount(CompetitivePanel, { props: { cards: [card({})], baseStats, plan: 'opt' } })
+    const wrapper = mount(CompetitivePanel, { props: { cards: [card({})], baseStats } })
     expect(wrapper.findAll('.sheet-quick-box')).toHaveLength(4)
   })
 
   it('should add an evolution row only when an evo method is supplied', () => {
-    const base = { cards: [card({})], baseStats, plan: 'opt' as const }
+    const base = { cards: [card({})], baseStats }
     expect(mount(CompetitivePanel, { props: base }).findAll('.sheet-comp-info-row')).toHaveLength(3)
     const withEvo = mount(CompetitivePanel, { props: { ...base, evoInfo: 'Evoluciona con objeto — usando Piedra Agua' } })
     const rows = withEvo.findAll('.sheet-comp-info-row')

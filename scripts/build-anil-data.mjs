@@ -113,8 +113,8 @@ formBlocks.forEach(b => {
       const raw6 = b.fields.BaseStats.split(',').map(Number);
       return raw6.length === 6 ? [raw6[0], raw6[1], raw6[2], raw6[4], raw6[5], raw6[3]] : raw6;
     })(),
-    types: b.fields.Types ? b.fields.Types.split(',').map(t => t.toLowerCase()) : null,
-    abilities: b.fields.Abilities ? b.fields.Abilities.split(',') : null
+    types: b.fields.Types ? b.fields.Types.split(',').map(t => t.trim().toLowerCase()) : null,
+    abilities: b.fields.Abilities ? b.fields.Abilities.split(',').map(a => a.trim()).filter(Boolean) : null
   };
   (megas[species] = megas[species] || []).push(entry);
 });
@@ -148,8 +148,8 @@ pokeBlocks.forEach(b => {
     heightM: f.Height ? parseFloat(f.Height) : 0,
     weightKg: f.Weight ? parseFloat(f.Weight) : 0,
     abilities: [
-      ...(f.Abilities ? f.Abilities.split(',').map(a => ({ id: a, name: abilityNames[a] || a, hidden: false })) : []),
-      ...(f.HiddenAbilities ? f.HiddenAbilities.split(',').map(a => ({ id: a, name: abilityNames[a] || a, hidden: true })) : [])
+      ...(f.Abilities ? f.Abilities.split(',').map(a => a.trim()).filter(Boolean).map(a => ({ id: a, name: abilityNames[a] || a, hidden: false })) : []),
+      ...(f.HiddenAbilities ? f.HiddenAbilities.split(',').map(a => a.trim()).filter(Boolean).map(a => ({ id: a, name: abilityNames[a] || a, hidden: true })) : [])
     ],
     catchRate: f.CatchRate ? parseInt(f.CatchRate, 10) : null,
     happiness: f.Happiness ? parseInt(f.Happiness, 10) : null,

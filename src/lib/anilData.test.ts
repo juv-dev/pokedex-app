@@ -10,6 +10,12 @@ describe('getAnilAbilityName', () => {
   it('should return the internal id unchanged when it is unknown', () => {
     expect(getAnilAbilityName('NOT_A_REAL_ABILITY')).toBe('NOT_A_REAL_ABILITY')
   })
+
+  it('should tolerate surrounding whitespace in the internal id', () => {
+    expect(getAnilAbilityName(' THICKFAT ')).toBe('Sebo')
+    expect(lookupAnilAbilityName('THICKFAT ')).toBe('Sebo')
+    expect(getAnilAbilityNumber(' THICKFAT')).toBe(47)
+  })
 })
 
 describe('getAnilAbilityNumber', () => {

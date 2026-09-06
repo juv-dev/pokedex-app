@@ -61,7 +61,7 @@ watch(activeNode, node => {
 const themeVars = computed(() => hudThemeVars(activeNode.value?.types))
 
 const templateCards = computed<TemplateCardVM[]>(() => {
-  if (templateState.value === 'ready' && loadedTemplateSet.value) {
+  if (!activeNode.value?.isMega && templateState.value === 'ready' && loadedTemplateSet.value) {
     const entries = loadedTemplateSet.value.entries
     const ordered = [...entries.filter(e => e.isPrimary), ...entries.filter(e => !e.isPrimary)]
     return ordered.map(e => toCardVM(e, templateGameData))
@@ -181,6 +181,21 @@ const stripNextName = computed(() => {
 function onStripPrev() { if (stripPrevName.value) searchAndSelect(stripPrevName.value) }
 function onStripNext() { if (stripNextName.value) searchAndSelect(stripNextName.value) }
 
+/** Anterior / Siguiente dentro del equipo y las cajas de la partida, en el orden del roster. */
+const saveOrder = computed(() => saveRoster.value.map(r => r.internalName))
+const savePrevName = computed(() => {
+  if (!activeNode.value) return null
+  const i = saveOrder.value.indexOf(activeNode.value.internalName)
+  return i > 0 ? saveOrder.value[i - 1] : null
+})
+const saveNextName = computed(() => {
+  if (!activeNode.value) return null
+  const i = saveOrder.value.indexOf(activeNode.value.internalName)
+  return i >= 0 && i < saveOrder.value.length - 1 ? saveOrder.value[i + 1] : null
+})
+function onSavePrev() { if (savePrevName.value) onRailSelect(savePrevName.value) }
+function onSaveNext() { if (saveNextName.value) onRailSelect(saveNextName.value) }
+
 function onOwnedChange(internalNames: string[]) { ownedInternalNames.value = internalNames }
 function onRosterChange(roster: RosterEntry[]) { saveRoster.value = roster }
 function onTeamMons(slots: Array<TeamSlotMon | null>) { saveTeamMons.value = slots }
@@ -274,8 +289,12 @@ searchAndSelect('BULBASAUR')
               :crumbs="saveCrumbs"
               :save-evs="saveDetailEvs"
               :save-ivs="saveDetailIvs"
+              :prev-available="!!savePrevName"
+              :next-available="!!saveNextName"
               @back="saveDetailOpen = false"
               @form-select="onFormDot"
+              @prev="onSavePrev"
+              @next="onSaveNext"
             />
           </template>
 
