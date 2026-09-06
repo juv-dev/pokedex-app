@@ -1,32 +1,24 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TemplateCardVM } from '../../lib/types'
-import { ToggleGroupRoot, ToggleGroupItem } from 'reka-ui'
 
 /**
- * "Resumen competitivo" / "Vista rápida" de la ficha (ref. C3U3T / pB0nc): estado Óptimo/Viable,
- * selector real, estadísticas rápidas y naturaleza / objeto / habilidad con su número.
+ * "Resumen competitivo" de la ficha (ref. C3U3T / pB0nc): un único set recomendado con su
+ * badge (ÓPTIMO para sets curados, VIABLE para el resto), estadísticas rápidas y
+ * naturaleza / objeto / habilidad con su número.
  */
 const props = defineProps<{
   cards: TemplateCardVM[]
   baseStats: number[]
-  plan: 'opt' | 'via'
   evoInfo?: string | null
 }>()
 
-const emit = defineEmits<{ (e: 'update:plan', value: 'opt' | 'via'): void }>()
+const active = computed<TemplateCardVM | null>(() => props.cards[0] ?? null)
 
-const active = computed<TemplateCardVM | null>(() => {
-  if (!props.cards.length) return null
-  return props.plan === 'opt' ? props.cards[0] : props.cards[1] ?? props.cards[0]
-})
-
+const isOptimo = computed(() => active.value?.tier === 'optimo')
 const badge = computed(() => {
-  const e = active.value
-  if (!e) return '—'
-  if (e.tier === 'optimo') return 'ÓPTIMO'
-  if (e.tier === 'viable') return 'VIABLE'
-  return e.tierLabel.toUpperCase()
+  if (!active.value) return '—'
+  return isOptimo.value ? 'ÓPTIMO' : 'VIABLE'
 })
 
 function splitNum(raw: string): { name: string; num: string | null } {
@@ -72,18 +64,10 @@ const quick = computed(() =>
   <section class="sheet-comp">
     <header class="sheet-comp-head">
       <h2>Resumen competitivo</h2>
-      <span class="sheet-comp-badge" :class="plan === 'opt' ? 'is-opt' : 'is-via'">
+      <span class="sheet-comp-badge" :class="isOptimo ? 'is-opt' : 'is-via'">
         <span class="sheet-comp-dot" aria-hidden="true"></span>{{ badge }}
       </span>
     </header>
-
-    <ToggleGroupRoot
-      class="sheet-plan" type="single" :model-value="plan"
-      @update:model-value="v => v && emit('update:plan', v as 'opt' | 'via')"
-    >
-      <ToggleGroupItem class="sheet-plan-item" value="opt">Óptimo</ToggleGroupItem>
-      <ToggleGroupItem class="sheet-plan-item" value="via">Viable</ToggleGroupItem>
-    </ToggleGroupRoot>
 
     <div class="sheet-quick">
       <div v-for="q in quick" :key="q.label" class="sheet-quick-box">

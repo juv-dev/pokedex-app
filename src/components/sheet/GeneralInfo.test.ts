@@ -9,7 +9,6 @@ function node(p: Partial<DexNode>): DexNode {
     eggGroups: [{ name: 'monster', url: '' }, { name: 'grass', url: '' }],
     abilities: [
       { ability: { name: 'overgrow', url: '' }, is_hidden: false },
-      { ability: { name: 'overgrow', url: '' }, is_hidden: false },
       { ability: { name: 'chlorophyll', url: '' }, is_hidden: true }
     ],
     ...p
@@ -17,16 +16,21 @@ function node(p: Partial<DexNode>): DexNode {
 }
 
 describe('GeneralInfo', () => {
-  it('should list species, height, weight and egg group', () => {
+  it('should list species, height and weight', () => {
     const text = mount(GeneralInfo, { props: { node: node({}) } }).text()
     expect(text).toContain('Semilla')
     expect(text).toContain('2.0 m')
     expect(text).toContain('100.0 kg')
-    expect(text).toContain('Monster · Grass')
+  })
+
+  it('should not render the egg group or abilities rows', () => {
+    const text = mount(GeneralInfo, { props: { node: node({}) } }).text()
+    expect(text).not.toContain('Grupo huevo')
+    expect(text).not.toContain('Habilidades')
   })
 
   const regionValue = (dexNum: number | null) =>
-    mount(GeneralInfo, { props: { node: node({ dexNum }) } }).findAll('.sheet-info-row')[4].get('dd').text()
+    mount(GeneralInfo, { props: { node: node({ dexNum }) } }).findAll('.sheet-info-row')[3].get('dd').text()
 
   it('should show the origin region derived from the national number', () => {
     expect(regionValue(3)).toBe('Kanto')
@@ -36,12 +40,5 @@ describe('GeneralInfo', () => {
 
   it('should label Añil-only species when there is no national number', () => {
     expect(regionValue(null)).toBe('Añil')
-  })
-
-  it('should de-duplicate abilities and flag the hidden one', () => {
-    const wrapper = mount(GeneralInfo, { props: { node: node({}) } })
-    const abilities = wrapper.findAll('.sheet-info-ability')
-    expect(abilities).toHaveLength(2)
-    expect(wrapper.get('.sheet-info-hidden').text()).toContain('oculta')
   })
 })

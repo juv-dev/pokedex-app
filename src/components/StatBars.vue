@@ -27,7 +27,7 @@ const rows = computed(() => META.map(([icon, label], i) => {
   const down = props.lowersIdx === i
   return {
     icon, label, value,
-    pct: Math.round((value / 180) * 100),
+    pct: Math.min(100, Math.round((value / 180) * 100)),
     mark: up ? '▲' : down ? '▼' : '',
     markFg: up ? '#ff8f6b' : '#7fb4ff',
     labelFg: up ? '#ffb59c' : down ? '#a9c8ff' : 'rgba(232,235,255,.92)',
@@ -51,7 +51,7 @@ const rows = computed(() => META.map(([icon, label], i) => {
       </span>
       <span class="hud-stat-val" :style="{ color: s.valueFg }">{{ s.value }}</span>
       <ProgressRoot
-        class="hud-stat-track" :model-value="s.value" :max="180"
+        class="hud-stat-track" :model-value="Math.min(s.value, 180)" :max="180"
         :aria-label="`${s.label}: ${s.value} de 180`"
       >
         <ProgressIndicator
