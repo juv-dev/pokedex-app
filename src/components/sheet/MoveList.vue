@@ -15,24 +15,27 @@ const props = defineProps<{
 const rows = computed(() => {
   const e = props.card
   if (!e) return []
-  return e.moveIds.map((id, i) => {
-    const data = props.gameData.move(id)
-    const type = data?.type ?? 'normal'
-    const isStatus = (data?.category ?? '') === 'Status'
-    const note = isStatus ? 'Utilidad' : props.nodeTypes.includes(type) ? 'STAB' : 'Cobertura'
-    const moveNum = getAnilMoveNumber(id)
-    return {
-      key: id + i,
-      num: moveNum != null ? '#' + moveNum : '—',
-      name: data?.name ?? e.moves[i] ?? id,
-      category: anilMoveCategoryEs(data?.category ?? '') || '—',
-      note,
-      power: data?.power != null ? String(data.power) : '—',
-      accuracy: data?.accuracy != null ? String(data.accuracy) : null,
-      pp: data?.pp != null ? String(data.pp) : '—',
-      type
-    }
-  })
+  return e.moveIds
+    .map((id, i) => {
+      const data = props.gameData.move(id)
+      const type = data?.type ?? 'normal'
+      const isStatus = (data?.category ?? '') === 'Status'
+      const note = isStatus ? 'Utilidad' : props.nodeTypes.includes(type) ? 'STAB' : 'Cobertura'
+      const moveNum = getAnilMoveNumber(id)
+      return {
+        key: id + i,
+        order: moveNum ?? Number.POSITIVE_INFINITY,
+        num: moveNum != null ? '#' + moveNum : '—',
+        name: data?.name ?? e.moves[i] ?? id,
+        category: anilMoveCategoryEs(data?.category ?? '') || '—',
+        note,
+        power: data?.power != null ? String(data.power) : '—',
+        accuracy: data?.accuracy != null ? String(data.accuracy) : null,
+        pp: data?.pp != null ? String(data.pp) : '—',
+        type
+      }
+    })
+    .sort((a, b) => a.order - b.order)
 })
 </script>
 

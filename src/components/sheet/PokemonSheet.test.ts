@@ -68,6 +68,16 @@ describe('PokemonSheet', () => {
     expect(wrapper.find('.sheet-nav').exists()).toBe(false)
   })
 
+  it('should render the evolution line only when the family has more than one form', () => {
+    const alone = mount(PokemonSheet, { props: { ...baseProps, context: 'dex' as const } })
+    expect(alone.find('.sheet-evo').exists()).toBe(false)
+
+    const ivysaur = { ...node, internalName: 'IVYSAUR', displayName: 'Ivysaur', stageKind: 'evo', parentInternalName: 'VENUSAUR', evoLabel: 'Nivel 16' } as unknown as DexNode
+    const family = mount(PokemonSheet, { props: { ...baseProps, nodes: [node, ivysaur], context: 'dex' as const } })
+    expect(family.find('.sheet-evo').exists()).toBe(true)
+    expect(family.findAll('.sheet-evo-row')).toHaveLength(2)
+  })
+
   it('should feed the recommended set EVs and IVs to the stat block, ignoring the save file values', () => {
     const recommended = card([4, 0, 0, 252, 0, 252], [31, 0, 31, 31, 31, 31])
     const wrapper = mount(PokemonSheet, {

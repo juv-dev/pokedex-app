@@ -19,10 +19,13 @@ describe('FileDropzone', () => {
     expect(wrapper.emitted('file')?.[0]?.[0]).toBe(file)
   })
 
-  it('should show a busy state while loading', () => {
+  it('should take over with an explicit loading state while reading the file', () => {
     const wrapper = mount(FileDropzone, { props: { state: 'loading' } })
     expect(wrapper.attributes('aria-busy')).toBe('true')
     expect(wrapper.find('.mp-drop-spinner').exists()).toBe(true)
+    expect(wrapper.get('.mp-drop-title').text()).toContain('Leyendo tu partida')
+    expect(wrapper.text()).not.toContain('Elegir archivo de partida')
+    expect(wrapper.find('.mp-drop-path').exists()).toBe(false)
   })
 
   it('should reflect the error state on the container', () => {

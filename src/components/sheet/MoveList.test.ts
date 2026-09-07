@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import MoveList from './MoveList.vue'
 import type { TemplateCardVM, TemplateGameData } from '../../lib/types'
+
+vi.mock('../../lib/anilData', async orig => {
+  const actual = await orig<typeof import('../../lib/anilData')>()
+  const numbers: Record<string, number> = { GIGADRAIN: 100, TOXIC: 200 }
+  return { ...actual, getAnilMoveNumber: (id: string) => numbers[id] ?? null }
+})
 
 const gameData = {
   move: (id: string) => ({
@@ -34,5 +40,13 @@ describe('MoveList', () => {
     const rows = wrapper.findAll('.sheet-move-meta').map(m => m.text())
     expect(rows[0]).toContain('STAB')
     expect(rows[1]).toContain('Utilidad')
+  })
+
+  it('should order the rows by ascending Añil move number regardless of set order', () => {
+    const unordered = { moveIds: ['TOXIC', 'GIGADRAIN'], moves: ['Tóxico', 'Gigadrenado'] } as TemplateCardVM
+    const wrapper = mount(MoveList, { props: { card: unordered, gameData, nodeTypes: ['grass', 'poison'] } })
+    const names = wrapper.findAll('.sheet-move-name').map(m => m.text())
+    expect(names[0]).toContain('#100 · Gigadrenado')
+    expect(names[1]).toContain('#200 · Tóxico')
   })
 })

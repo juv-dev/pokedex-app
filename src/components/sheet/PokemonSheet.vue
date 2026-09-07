@@ -8,6 +8,7 @@ import CompetitivePanel from './CompetitivePanel.vue'
 import GeneralInfo from './GeneralInfo.vue'
 import StatBlock from './StatBlock.vue'
 import MoveList from './MoveList.vue'
+import EvoLine from './EvoLine.vue'
 import MegaEvolution from './MegaEvolution.vue'
 
 /**
@@ -55,6 +56,8 @@ const statEvs = computed(() => activeCard.value?.evs ?? props.saveEvs ?? [0, 0, 
 const statIvs = computed(() => activeCard.value?.ivs ?? props.saveIvs ?? [31, 31, 31, 31, 31, 31])
 
 const hasMegas = computed(() => props.nodes.some(n => n.stageKind === 'mega'))
+const hasEvoLine = computed(() => props.nodes.filter(n => n.stageKind !== 'mega').length > 1)
+const hasFormsRow = computed(() => hasEvoLine.value || hasMegas.value)
 
 /** Cómo se obtiene ESTE Pokémon: "Desde {pre-evolución} · {método}". Null en formas base y megas. */
 const evoInfo = computed(() => {
@@ -112,8 +115,12 @@ const showNav = computed(() => props.prevAvailable || props.nextAvailable)
             :card="activeCard" :game-data="gameData" :node-types="node.types"
             :title="context === 'save' ? 'Movimientos del set' : 'Movimientos'"
           />
-          <MegaEvolution v-if="hasMegas" :nodes="nodes" :active-idx="idx" @select="i => emit('form-select', i)" />
         </div>
+      </div>
+
+      <div v-if="hasFormsRow" class="sheet-forms" :class="{ 'is-split': hasEvoLine && hasMegas }">
+        <EvoLine v-if="hasEvoLine" :nodes="nodes" :active-idx="idx" @select="i => emit('form-select', i)" />
+        <MegaEvolution v-if="hasMegas" :nodes="nodes" :active-idx="idx" @select="i => emit('form-select', i)" />
       </div>
     </div>
   </div>

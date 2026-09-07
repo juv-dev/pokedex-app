@@ -41,6 +41,11 @@ const statusIsError = ref(false)
 const loading = ref(false)
 const summaries = ref<TeamSummary[]>([])
 
+function paintFrame(): Promise<void> {
+  if (typeof requestAnimationFrame !== 'function') return Promise.resolve()
+  return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+}
+
 const party = computed(() => summaries.value.filter(s => s.inParty))
 const ownedInternalNames = computed(() => uniqueOwnedInternalNames(summaries.value))
 
@@ -113,6 +118,7 @@ async function processFile(file: File) {
   status.value = 'Leyendo y analizando el archivo de partida…'
   statusIsError.value = false
   loading.value = true
+  await paintFrame()
   try {
     const found = await readSaveFile(file)
     if (!found.length) {
@@ -180,6 +186,6 @@ async function loadSummaries(pokemons: FoundPokemon[]) {
       <input id="mpChangeFile" class="mp-drop-input" type="file" accept=".rxdata,.bak" @change="onChangeFile">
     </div>
 
-    <TeamPreview :slots="teamMons" @select="name => emit('select', name)" />
+    <TeamPreview :slots="teamMons" :loading="loading" @select="name => emit('select', name)" />
   </div>
 </template>
