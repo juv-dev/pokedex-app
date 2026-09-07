@@ -30,6 +30,14 @@ describe('TeamPreview', () => {
     expect(wrapper.text()).toContain('Mon 1')
   })
 
+  it('should show an explicit waiting state instead of empty slots while loading', () => {
+    const wrapper = mount(TeamPreview, { props: { slots: [], loading: true } })
+    expect(wrapper.get('.mp-preview').attributes('aria-busy')).toBe('true')
+    expect(wrapper.get('.mp-preview-wait').text()).toContain('Analizando tu partida')
+    expect(wrapper.find('.mp-preview-grid').exists()).toBe(false)
+    expect(wrapper.findAll('.mp-slot')).toHaveLength(0)
+  })
+
   it('should emit select with the internal name when a filled card is clicked', async () => {
     const wrapper = mount(TeamPreview, { props: { slots: [mon(1), null, null, null, null, null] } })
     await wrapper.get('button.mp-slot').trigger('click')

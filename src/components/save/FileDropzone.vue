@@ -58,19 +58,23 @@ function onDrop(e: DragEvent) {
       <span v-else class="mp-drop-spinner"></span>
     </span>
 
-    <h2 class="mp-drop-title">¿Qué Pokémon tienes en tu partida?</h2>
+    <h2 class="mp-drop-title">{{ busy ? 'Leyendo tu partida…' : '¿Qué Pokémon tienes en tu partida?' }}</h2>
     <p class="mp-drop-text">
-      Arrastra tu archivo aquí o selecciónalo. Se procesa en tu navegador y no se envía a ningún servidor.
+      {{ busy
+        ? 'Analizando el archivo en tu navegador. Puede tardar unos segundos; no cierres esta pestaña.'
+        : 'Arrastra tu archivo aquí o selecciónalo. Se procesa en tu navegador y no se envía a ningún servidor.' }}
     </p>
 
-    <button type="button" class="mp-drop-btn" @click.stop="pick">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
-      </svg>
-      Elegir archivo de partida
-    </button>
+    <template v-if="!busy">
+      <button type="button" class="mp-drop-btn" @click.stop="pick">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+        </svg>
+        Elegir archivo de partida
+      </button>
 
-    <p class="mp-drop-path">{{ path }}</p>
+      <p class="mp-drop-path">{{ path }}</p>
+    </template>
 
     <input
       ref="inputEl" class="mp-drop-input" type="file" accept=".rxdata,.bak"

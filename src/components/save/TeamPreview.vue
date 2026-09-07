@@ -2,9 +2,10 @@
 import { computed } from 'vue'
 import TeamSlot, { type TeamSlotMon } from './TeamSlot.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   slots: Array<TeamSlotMon | null>
-}>()
+  loading?: boolean
+}>(), { loading: false })
 
 const emit = defineEmits<{ (e: 'select', internalName: string): void }>()
 
@@ -16,12 +17,22 @@ const title = computed(() => (detected.value > 0 ? 'Vista del equipo' : 'Vista p
 </script>
 
 <template>
-  <section class="mp-preview" :aria-label="title">
+  <section class="mp-preview" :aria-label="title" :aria-busy="loading ? 'true' : undefined">
     <header class="mp-preview-head">
-      <h2>{{ title }}</h2>
-      <span class="mp-preview-count">{{ detected }} / 6 detectados</span>
+      <h2>{{ loading ? 'Leyendo tu partida' : title }}</h2>
+      <span v-if="loading" class="mp-preview-count is-loading" role="status">
+        <span class="mp-preview-spin" aria-hidden="true"></span>
+        Analizando…
+      </span>
+      <span v-else class="mp-preview-count">{{ detected }} / 6 detectados</span>
     </header>
-    <div class="mp-preview-grid">
+
+    <div v-if="loading" class="mp-preview-wait" role="status">
+      <span class="mp-preview-spin-lg" aria-hidden="true"></span>
+      <p class="mp-preview-wait-title">Analizando tu partida…</p>
+      <p class="mp-preview-wait-sub">Leyendo el equipo y las cajas del PC. Puede tardar unos segundos.</p>
+    </div>
+    <div v-else class="mp-preview-grid">
       <TeamSlot
         v-for="(mon, i) in cells" :key="i"
         :index="i + 1" :mon="mon" layout="preview"
