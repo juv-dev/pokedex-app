@@ -5,6 +5,8 @@ import BoxFilter from './BoxFilter.vue'
 import type { RosterEntry } from '../SaveView.vue'
 
 function entry(p: Partial<RosterEntry> & { internalName: string }): RosterEntry {
+  const boxIndex = p.boxIndex ?? null
+  const boxSlot = p.boxSlot ?? null
   return {
     internalName: p.internalName,
     num: p.num ?? '#001',
@@ -13,8 +15,10 @@ function entry(p: Partial<RosterEntry> & { internalName: string }): RosterEntry 
     types: p.types ?? ['normal'],
     where: p.boxLabel ?? 'Equipo',
     inParty: p.inParty ?? false,
-    boxIndex: p.boxIndex ?? null,
-    boxLabel: p.boxLabel ?? 'Equipo'
+    boxIndex,
+    boxLabel: p.boxLabel ?? 'Equipo',
+    boxSlot,
+    key: p.key ?? (p.inParty ? `party:${p.internalName}` : `box:${boxIndex}:${boxSlot}:${p.internalName}`)
   }
 }
 
@@ -53,6 +57,45 @@ describe('SaveRosterSidebar', () => {
     const rows = wrapper.findAll('.mp-roster-row')
     expect(rows).toHaveLength(1)
     expect(rows[0].text()).toContain('Yanmega')
+  })
+
+  it('should render the same species that lives in two boxes as two separate rows', () => {
+    const dup: RosterEntry[] = [
+      entry({ internalName: 'LEDIAN', name: 'Ledian', boxIndex: 0, boxSlot: 3, boxLabel: 'Caja 1' }),
+      entry({ internalName: 'LEDIAN', name: 'Ledian', boxIndex: 6, boxSlot: 0, boxLabel: 'Caja 7' })
+    ]
+    const wrapper = mount(SaveRosterSidebar, { props: { roster: dup, ...base } })
+    const rows = wrapper.findAll('.mp-roster-row')
+    expect(rows).toHaveLength(2)
+    expect(rows.map(r => r.text())).toEqual([
+      expect.stringContaining('Caja 1'),
+      expect.stringContaining('Caja 7')
+    ])
+  })
+
+  it('should render every copy of a repeated species inside a single box', () => {
+    const dup: RosterEntry[] = [
+      entry({ internalName: 'LEDIAN', name: 'Ledian', boxIndex: 6, boxSlot: 0, boxLabel: 'Caja 7' }),
+      entry({ internalName: 'DUSTOX', name: 'Dustox', boxIndex: 6, boxSlot: 1, boxLabel: 'Caja 7' }),
+      entry({ internalName: 'LEDIAN', name: 'Ledian', boxIndex: 6, boxSlot: 2, boxLabel: 'Caja 7' })
+    ]
+    const wrapper = mount(SaveRosterSidebar, { props: { roster: dup, ...base } })
+    const names = wrapper.findAll('.mp-roster-name').map(n => n.text())
+    expect(names).toEqual(['Ledian', 'Dustox', 'Ledian'])
+  })
+
+  it('should keep the box slot order given by the roster when a box is active', async () => {
+    const ordered: RosterEntry[] = [
+      entry({ internalName: 'LEDIAN', name: 'Ledian', boxIndex: 6, boxSlot: 0, boxLabel: 'Caja 7' }),
+      entry({ internalName: 'DUSTOX', name: 'Dustox', boxIndex: 6, boxSlot: 1, boxLabel: 'Caja 7' }),
+      entry({ internalName: 'BEEDRILL', name: 'Beedrill', boxIndex: 6, boxSlot: 2, boxLabel: 'Caja 7' })
+    ]
+    const wrapper = mount(SaveRosterSidebar, { props: { roster: ordered, ...base } })
+    const filter = wrapper.findComponent(BoxFilter)
+    filter.vm.$emit('update:model', 6)
+    await wrapper.vm.$nextTick()
+    const names = wrapper.findAll('.mp-roster-name').map(n => n.text())
+    expect(names).toEqual(['Ledian', 'Dustox', 'Beedrill'])
   })
 
   it('should emit select with the internal name of the clicked row', async () => {

@@ -116,6 +116,8 @@ export interface FoundPokemon {
   boxIndex: number | null
   /** Nombre real de la caja tal como está en tu partida (ej. "Caja 1"), o null si es del equipo. */
   boxName: string | null
+  /** Posición real (0-based) dentro del array de la caja, respetando huecos vacíos; null si es del equipo. */
+  boxSlot: number | null
 }
 
 /**
@@ -123,6 +125,8 @@ export interface FoundPokemon {
  * Pokémon Essentials `PokemonStorage` (ivar `@boxes`, array de `PokemonBox`, cada una con
  * `@name` y `@pokemon` — ver Data/Scripts/044_Pokemon-related/005_PokemonStorage.rb del juego)
  * para poder etiquetar cada Pokémon de caja con su caja y mantener el orden real de sus slots.
+ * Los Pokémon sueltos fuera del equipo y de las cajas (Salón de la Fama, errantes, guardería)
+ * se ignoran: no forman parte de la colección que muestra la partida.
  */
 export function findAllPokemon(root: unknown): FoundPokemon[] {
   const found: FoundPokemon[] = []
@@ -134,10 +138,10 @@ export function findAllPokemon(root: unknown): FoundPokemon[] {
     const boxName = (box.__ivars['@name'] as string) || `Caja ${boxIndex + 1}`
     const pokemonArr = box.__ivars['@pokemon']
     if (!Array.isArray(pokemonArr)) return
-    pokemonArr.forEach(p => {
+    pokemonArr.forEach((p, boxSlot) => {
       if (isUserObject(p) && p.__class === 'Pokemon' && !visited.has(p)) {
         visited.add(p)
-        found.push({ obj: p, inParty: false, boxIndex, boxName })
+        found.push({ obj: p, inParty: false, boxIndex, boxName, boxSlot })
       }
     })
   }
@@ -148,7 +152,7 @@ export function findAllPokemon(root: unknown): FoundPokemon[] {
     visited.add(node)
     if (Array.isArray(node)) { node.forEach(n => walk(n, inParty)); return }
     if (isUserObject(node)) {
-      if (node.__class === 'Pokemon') { found.push({ obj: node, inParty, boxIndex: null, boxName: null }); return }
+      if (node.__class === 'Pokemon') { if (inParty) found.push({ obj: node, inParty: true, boxIndex: null, boxName: null, boxSlot: null }); return }
       if (node.__class === 'PokemonStorage') {
         const boxes = node.__ivars['@boxes']
         if (Array.isArray(boxes)) { boxes.forEach((b, i) => { if (isUserObject(b)) walkBox(b, i) }); return }

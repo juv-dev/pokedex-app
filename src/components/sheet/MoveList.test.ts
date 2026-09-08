@@ -42,11 +42,11 @@ describe('MoveList', () => {
     expect(rows[1]).toContain('Utilidad')
   })
 
-  it('should order the rows by ascending Añil move number regardless of set order', () => {
-    const unordered = { moveIds: ['TOXIC', 'GIGADRAIN'], moves: ['Tóxico', 'Gigadrenado'] } as TemplateCardVM
-    const wrapper = mount(MoveList, { props: { card: unordered, gameData, nodeTypes: ['grass', 'poison'] } })
+  it('should keep the set order so it matches what gets written to the save', () => {
+    const asWritten = { moveIds: ['TOXIC', 'GIGADRAIN'], moves: ['Tóxico', 'Gigadrenado'] } as TemplateCardVM
+    const wrapper = mount(MoveList, { props: { card: asWritten, gameData, nodeTypes: ['grass', 'poison'] } })
     const names = wrapper.findAll('.sheet-move-name').map(m => m.text())
-    expect(names[0]).toContain('#100 · Gigadrenado')
-    expect(names[1]).toContain('#200 · Tóxico')
+    expect(names[0]).toContain('#200 · Tóxico')
+    expect(names[1]).toContain('#100 · Gigadrenado')
   })
 })
