@@ -46,7 +46,7 @@ const rows = computed(() =>
 
     <div class="mp-roster-list">
       <button
-        v-for="r in rows" :key="r.internalName" type="button"
+        v-for="r in rows" :key="r.key" type="button"
         class="mp-roster-row" :class="{ 'is-active': r.internalName === activeInternalName }"
         :aria-current="r.internalName === activeInternalName ? 'true' : undefined"
         @click="emit('select', r.internalName)"

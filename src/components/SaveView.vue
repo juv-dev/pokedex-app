@@ -7,6 +7,7 @@ import { uniqueOwnedInternalNames } from '../lib/collection'
 import ReaderStatus, { type ReaderState } from './save/ReaderStatus.vue'
 import FileDropzone, { type DropzoneState } from './save/FileDropzone.vue'
 import TeamPreview from './save/TeamPreview.vue'
+import GenerateSetsPanel from './save/GenerateSetsPanel.vue'
 import type { TeamSlotMon } from './save/TeamSlot.vue'
 
 /**
@@ -24,6 +25,8 @@ export interface RosterEntry {
   inParty: boolean
   boxIndex: number | null
   boxLabel: string
+  boxSlot: number | null
+  key: string
 }
 
 const emit = defineEmits<{
@@ -40,6 +43,7 @@ const status = ref('')
 const statusIsError = ref(false)
 const loading = ref(false)
 const summaries = ref<TeamSummary[]>([])
+const saveBytes = ref<Uint8Array | null>(null)
 
 function paintFrame(): Promise<void> {
   if (typeof requestAnimationFrame !== 'function') return Promise.resolve()
@@ -66,10 +70,12 @@ const teamMons = computed<Array<TeamSlotMon | null>>(() =>
 const roster = computed<RosterEntry[]>(() => {
   const list = [...summaries.value].sort((a, b) => {
     if (a.inParty !== b.inParty) return a.inParty ? -1 : 1
-    return (a.boxIndex ?? 999) - (b.boxIndex ?? 999)
+    if ((a.boxIndex ?? 999) !== (b.boxIndex ?? 999)) return (a.boxIndex ?? 999) - (b.boxIndex ?? 999)
+    return (a.boxSlot ?? 999) - (b.boxSlot ?? 999)
   })
   return list.map((s, i) => {
     const boxLabel = s.inParty ? 'Equipo' : (s.boxName || `Caja ${(s.boxIndex ?? 0) + 1}`)
+    const boxSlot = s.inParty ? null : s.boxSlot
     return {
       internalName: s.internalName,
       num: s.dexNum != null ? '#' + String(s.dexNum).padStart(3, '0') : '#' + String(i + 1).padStart(3, '0'),
@@ -79,7 +85,9 @@ const roster = computed<RosterEntry[]>(() => {
       where: boxLabel,
       inParty: s.inParty,
       boxIndex: s.inParty ? null : s.boxIndex,
-      boxLabel
+      boxLabel,
+      boxSlot,
+      key: s.inParty ? `party:${i}` : `box:${s.boxIndex}:${boxSlot}:${s.internalName}`
     }
   })
 })
@@ -111,6 +119,7 @@ async function processFile(file: File) {
   fileName.value = file.name
   emit('file-name', file.name)
   summaries.value = []
+  saveBytes.value = null
   emit('owned-change', [])
   emit('roster-change', [])
   emit('team-mons', teamMons.value)
@@ -120,6 +129,8 @@ async function processFile(file: File) {
   loading.value = true
   await paintFrame()
   try {
+    const buffer = await file.arrayBuffer()
+    saveBytes.value = new Uint8Array(buffer)
     const found = await readSaveFile(file)
     if (!found.length) {
       status.value = 'No se encontraron Pokémon en ese archivo.'
@@ -129,6 +140,7 @@ async function processFile(file: File) {
     await loadSummaries(found)
     status.value = `${summaries.value.length} Pokémon leídos de tu partida (equipo + caja PC).`
   } catch {
+    saveBytes.value = null
     status.value = 'No se pudo leer el archivo. ¿Es un .rxdata válido de Pokémon Essentials?'
     statusIsError.value = true
   } finally {
@@ -187,5 +199,7 @@ async function loadSummaries(pokemons: FoundPokemon[]) {
     </div>
 
     <TeamPreview :slots="teamMons" :loading="loading" @select="name => emit('select', name)" />
+
+    <GenerateSetsPanel v-if="loaded" :bytes="saveBytes" :file-name="fileName" :species="ownedInternalNames" />
   </div>
 </template>

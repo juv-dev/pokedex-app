@@ -25,6 +25,7 @@ export interface TeamSummary {
   inParty: boolean
   boxIndex: number | null
   boxName: string | null
+  boxSlot: number | null
 }
 
 export async function fetchTeamSummary(found: FoundPokemon): Promise<TeamSummary | null> {
@@ -54,7 +55,8 @@ export async function fetchTeamSummary(found: FoundPokemon): Promise<TeamSummary
     ballLabel: ballId ? getAnilItemName(ballId) : 'Poké Ball',
     inParty: found.inParty,
     boxIndex: found.boxIndex,
-    boxName: found.boxName
+    boxName: found.boxName,
+    boxSlot: found.boxSlot
   }
 }
 
