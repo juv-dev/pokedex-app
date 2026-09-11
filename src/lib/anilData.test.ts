@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getAnilAbilityName, getAnilAbilityNumber, getAnilAbilityNumberByName, getAnilItemNumber, getAnilItemNumberByName, lookupAnilAbilityName, lookupAnilItemName, assertAnilSchema, preEvolutionIndex, findRootInternalName, evolutionsForForm, canEvolve, ANIL_SCHEMA_VERSION } from './anilData'
+import { getAnilAbilityName, getAnilAbilityNumber, getAnilAbilityNumberByName, getAnilItemNumber, getAnilItemNumberByName, lookupAnilAbilityName, lookupAnilItemName, assertAnilSchema, preEvolutionIndex, findRootInternalName, evolutionsForForm, canEvolve, evoMethodLabel, ANIL_SCHEMA_VERSION } from './anilData'
 import anilSchema from '../data/anil-schema.json'
 
 describe('getAnilAbilityName', () => {
@@ -154,6 +154,46 @@ describe('canEvolve', () => {
 
   it('should keep the base evolution for a cosmetic form with a None-method entry', () => {
     expect(canEvolve('PIKACHU', 2)).toBe(true)
+  })
+})
+
+describe('evoMethodLabel', () => {
+  it('should describe a plain level-up evolution with its level', () => {
+    expect(evoMethodLabel('Level', '16')).toBe('Evoluciona subiendo de nivel — nivel 16')
+  })
+
+  it('should describe the Tyrogue stat-comparison evolutions as plain level-up, without leaking the raw method name', () => {
+    expect(evoMethodLabel('AttackGreater', '23')).toBe('Evoluciona subiendo de nivel — nivel 23')
+    expect(evoMethodLabel('DefenseGreater', '23')).toBe('Evoluciona subiendo de nivel — nivel 23')
+    expect(evoMethodLabel('AtkDefEqual', '23')).toBe('Evoluciona subiendo de nivel — nivel 23')
+  })
+
+  it('should prefix the Tyrogue stat-comparison evolutions with their origin species when given', () => {
+    expect(evoMethodLabel('AttackGreater', '23', 'Tyrogue')).toBe('Desde Tyrogue · subiendo de nivel — nivel 23')
+    expect(evoMethodLabel('DefenseGreater', '23', 'Tyrogue')).toBe('Desde Tyrogue · subiendo de nivel — nivel 23')
+    expect(evoMethodLabel('AtkDefEqual', '23', 'Tyrogue')).toBe('Desde Tyrogue · subiendo de nivel — nivel 23')
+  })
+
+  it('should describe a night-only level-up evolution, without leaking the raw method name', () => {
+    expect(evoMethodLabel('LevelNight', '20')).toBe('Evoluciona subiendo de nivel — nivel 20, de noche')
+  })
+
+  it('should describe a female-only item evolution, without leaking the raw method name', () => {
+    expect(evoMethodLabel('ItemFemale', 'DAWNSTONE')).toBe('Evoluciona con objeto (hembra) — usando Piedra Alba')
+  })
+
+  it('should describe the Wurmple nature-gated evolutions without leaking the raw method name', () => {
+    expect(evoMethodLabel('Cascoon', '7')).toBe('Evoluciona subiendo de nivel — nivel 7, según su naturaleza (hacia Cascoon)')
+    expect(evoMethodLabel('Silcoon', '7')).toBe('Evoluciona subiendo de nivel — nivel 7, según su naturaleza (hacia Silcoon)')
+  })
+
+  it('should describe the Nincada split evolution into Ninjask and Shedinja without leaking the raw method name', () => {
+    expect(evoMethodLabel('Ninjask', '20')).toBe('Evoluciona subiendo de nivel — nivel 20')
+    expect(evoMethodLabel('Shedinja', '20')).toBe('Aparece al evolucionar Nincada a Ninjask, con una Poké Ball libre en la mochila')
+  })
+
+  it('should describe a trade-for-species evolution by resolving the target species name', () => {
+    expect(evoMethodLabel('TradeSpecies', 'SHELMET')).toBe('Evoluciona por intercambio — junto a un Shelmet')
   })
 })
 

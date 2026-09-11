@@ -208,12 +208,16 @@ export function anilMoveCategoryEs(category: string): string {
   return CAT_ES[category] || category
 }
 
-export function evoMethodLabel(method: string, param: string | null): string {
+export function evoMethodLabel(method: string, param: string | null, fromName?: string): string {
   const item = param ? getAnilItemName(param) : ''
+  const prefix = fromName ? `Desde ${fromName} · ` : 'Evoluciona '
   switch (method) {
     case 'Level': return `Evoluciona subiendo de nivel — nivel ${param}`
     case 'LevelMale': return `Evoluciona subiendo de nivel (macho) — nivel ${param}`
     case 'LevelFemale': return `Evoluciona subiendo de nivel (hembra) — nivel ${param}`
+    case 'AttackGreater': return `${prefix}subiendo de nivel — nivel ${param}`
+    case 'DefenseGreater': return `${prefix}subiendo de nivel — nivel ${param}`
+    case 'AtkDefEqual': return `${prefix}subiendo de nivel — nivel ${param}`
     case 'Item': return `Evoluciona con objeto — usando ${item}`
     case 'Happiness': return 'Evoluciona subiendo de nivel — felicidad alta'
     case 'HappinessDay': return 'Evoluciona subiendo de nivel — felicidad alta, de día'
@@ -223,8 +227,15 @@ export function evoMethodLabel(method: string, param: string | null): string {
     case 'NightHoldItem': return `Evoluciona subiendo de nivel — de noche, llevando ${item}`
     case 'TradeItem': return `Evoluciona por intercambio — llevando ${item}`
     case 'Trade': return 'Evoluciona por intercambio'
+    case 'TradeSpecies': return `Evoluciona por intercambio — junto a un ${getAnilSpecies(String(param))?.name || param}`
     case 'HasMove': return `Evoluciona subiendo de nivel — sabiendo cierto movimiento`
     case 'LocationMap': return 'Evoluciona subiendo de nivel — en cierta zona'
+    case 'LevelNight': return `Evoluciona subiendo de nivel — nivel ${param}, de noche`
+    case 'ItemFemale': return `Evoluciona con objeto (hembra) — usando ${item}`
+    case 'Cascoon': return `${prefix}subiendo de nivel — nivel ${param}, según su naturaleza (hacia Cascoon)`
+    case 'Silcoon': return `${prefix}subiendo de nivel — nivel ${param}, según su naturaleza (hacia Silcoon)`
+    case 'Ninjask': return `Evoluciona subiendo de nivel — nivel ${param}`
+    case 'Shedinja': return 'Aparece al evolucionar Nincada a Ninjask, con una Poké Ball libre en la mochila'
     default: return `Evoluciona subiendo de nivel${param ? ' — ' + method + ' ' + param : ' — ' + method}`
   }
 }

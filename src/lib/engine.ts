@@ -397,12 +397,16 @@ export async function buildAnilNodes(internalName: string, isRoot: boolean, spec
  * etiquetadas con el nombre de esa forma para no confundirlas con la evolución de la forma base.
  */
 export function anilEvolutionEdges(sp: AnilSpecies): Array<{ target: string; label: string }> {
-  const base = sp.evolutions.map(evo => ({ target: evo.target, label: evoMethodLabel(evo.method, evo.param) }))
+  const base = sp.evolutions
+    .filter(evo => evo.method !== 'None')
+    .map(evo => ({ target: evo.target, label: evoMethodLabel(evo.method, evo.param, sp.name) }))
   const formGated = (sp.formEvolutions ?? []).flatMap(fe =>
-    fe.evolutions.map(evo => {
-      const label = evoMethodLabel(evo.method, evo.param)
-      return { target: evo.target, label: fe.formName ? `${label} (${fe.formName})` : label }
-    })
+    fe.evolutions
+      .filter(evo => evo.method !== 'None')
+      .map(evo => {
+        const label = evoMethodLabel(evo.method, evo.param, sp.name)
+        return { target: evo.target, label: fe.formName ? `${label} (${fe.formName})` : label }
+      })
   )
   return [...base, ...formGated]
 }
