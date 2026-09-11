@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SaveRosterSidebar from './SaveRosterSidebar.vue'
 import BoxFilter from './BoxFilter.vue'
-import type { RosterEntry } from '../SaveView.vue'
+import type { RosterEntry } from '../../lib/roster'
 
 function entry(p: Partial<RosterEntry> & { internalName: string }): RosterEntry {
   const boxIndex = p.boxIndex ?? null
   const boxSlot = p.boxSlot ?? null
   return {
+    instanceKey: p.instanceKey ?? `loc:${p.inParty ? 'team' : `box${boxIndex}:${boxSlot}`}:${p.internalName}`,
     internalName: p.internalName,
     num: p.num ?? '#001',
     name: p.name ?? p.internalName,

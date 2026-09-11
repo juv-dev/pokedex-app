@@ -1,16 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { TYPE_ES } from '../../lib/constants'
+import type { TeamSlotMon } from '../../lib/roster'
 import TypeIcon from '../TypeIcon.vue'
 
-export interface TeamSlotMon {
-  internalName: string
-  sprite: string
-  num: string
-  name: string
-  level?: number | string
-  types?: string[]
-}
+export type { TeamSlotMon }
 
 const props = withDefaults(defineProps<{
   index: number

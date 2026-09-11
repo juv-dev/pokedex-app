@@ -334,6 +334,22 @@ async function buildAnilNode(
 }
 
 /**
+ * Arte de la megaevolución `formName` de `internalName`: primero el override local de Añil,
+ * luego el artwork de la variedad `-mega` en PokéAPI. `null` si no hay arte real disponible.
+ */
+export async function megaSpriteUrl(internalName: string, formName: string | null): Promise<string | null> {
+  const local = localMegaSpriteUrl(internalName, formName)
+  if (local) return local
+  try {
+    const resolved = await tryFetchPokeApi(internalName, await resolveSpeciesMap())
+    if (!resolved) return null
+    return await fetchMegaArtwork(resolved.species, formName)
+  } catch {
+    return null
+  }
+}
+
+/**
  * Arma la línea evolutiva completa (+ megas) a partir de datos REALES de Añil
  * (PBS/pokemon.txt y PBS/pokemon_forms.txt), no del endpoint de evolución de PokéAPI.
  * PokéAPI solo se usa para sprite/detalle cuando la especie existe ahí tal cual.

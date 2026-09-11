@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getAnilAbilityName, getAnilAbilityNumber, getAnilAbilityNumberByName, getAnilItemNumber, getAnilItemNumberByName, lookupAnilAbilityName, lookupAnilItemName, assertAnilSchema, preEvolutionIndex, findRootInternalName, ANIL_SCHEMA_VERSION } from './anilData'
+import { getAnilAbilityName, getAnilAbilityNumber, getAnilAbilityNumberByName, getAnilItemNumber, getAnilItemNumberByName, lookupAnilAbilityName, lookupAnilItemName, assertAnilSchema, preEvolutionIndex, findRootInternalName, evolutionsForForm, canEvolve, ANIL_SCHEMA_VERSION } from './anilData'
 import anilSchema from '../data/anil-schema.json'
 
 describe('getAnilAbilityName', () => {
@@ -127,6 +127,33 @@ describe('findRootInternalName', () => {
 
   it('should return the input unchanged for a base form', () => {
     expect(findRootInternalName('BULBASAUR')).toBe('BULBASAUR')
+  })
+})
+
+describe('evolutionsForForm', () => {
+  it('should add the Galarian form evolution on top of the base list', () => {
+    const galar = evolutionsForForm('CORSOLA', 1)
+    expect(galar.some(e => e.target === 'CURSOLA' && e.method === 'Level' && e.param === '38')).toBe(true)
+  })
+
+  it('should fall back to the bare base list for a form with no override', () => {
+    expect(evolutionsForForm('CORSOLA', 0)).toEqual([])
+    expect(evolutionsForForm('BULBASAUR', 0).map(e => e.target)).toContain('IVYSAUR')
+  })
+})
+
+describe('canEvolve', () => {
+  it('should report a Galarian Corsola as still able to evolve', () => {
+    expect(canEvolve('CORSOLA', 1)).toBe(true)
+  })
+
+  it('should report a regular Corsola as fully evolved', () => {
+    expect(canEvolve('CORSOLA', 0)).toBe(false)
+    expect(canEvolve('CORSOLA')).toBe(false)
+  })
+
+  it('should keep the base evolution for a cosmetic form with a None-method entry', () => {
+    expect(canEvolve('PIKACHU', 2)).toBe(true)
   })
 })
 

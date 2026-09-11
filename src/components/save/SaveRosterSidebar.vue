@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { RosterEntry } from '../SaveView.vue'
+import type { RosterEntry } from '../../lib/roster'
 import BoxFilter from './BoxFilter.vue'
 
 /**

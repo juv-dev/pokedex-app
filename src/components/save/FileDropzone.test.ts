@@ -3,11 +3,11 @@ import { mount } from '@vue/test-utils'
 import FileDropzone from './FileDropzone.vue'
 
 describe('FileDropzone', () => {
-  it('should render the action button and the usual path hint', () => {
+  it('should render the action button and the requirement hints', () => {
     const wrapper = mount(FileDropzone)
     expect(wrapper.text()).toContain('Elegir archivo de partida')
-    expect(wrapper.get('.mp-drop-path').text()).toContain('Partida 1.rxdata')
-    expect(wrapper.text()).toContain('no se envía a ningún servidor')
+    expect(wrapper.text()).toContain('Solo .rxdata')
+    expect(wrapper.text()).toContain('Tu archivo permanece privado')
   })
 
   it('should emit the selected file from the input change', async () => {
@@ -25,7 +25,6 @@ describe('FileDropzone', () => {
     expect(wrapper.find('.mp-drop-spinner').exists()).toBe(true)
     expect(wrapper.get('.mp-drop-title').text()).toContain('Leyendo tu partida')
     expect(wrapper.text()).not.toContain('Elegir archivo de partida')
-    expect(wrapper.find('.mp-drop-path').exists()).toBe(false)
   })
 
   it('should reflect the error state on the container', () => {

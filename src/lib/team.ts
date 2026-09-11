@@ -11,6 +11,7 @@ import type { CompetitiveSet, MoveDetail, TypeMatchups, CurrentMove } from './ty
 export interface TeamSummary {
   raw: MarshalUserObject
   internalName: string
+  form?: number
   dexNum: number | null
   displayName: string
   nickname: string | null
@@ -42,6 +43,7 @@ export async function fetchTeamSummary(found: FoundPokemon): Promise<TeamSummary
   return {
     raw: pokemon,
     internalName,
+    form: typeof iv['@form'] === 'number' ? (iv['@form'] as number) : 0,
     dexNum: resolved ? resolved.species.id : null,
     displayName: sp.name,
     nickname: (iv['@name'] as string) || null,

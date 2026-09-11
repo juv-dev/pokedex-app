@@ -1,38 +1,72 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import type { DexNode, CompetitiveSet, MoveDetail, LoadedTemplateSet, TemplateCardVM } from './lib/types'
+import type { DexNode, CompetitiveSet, MoveDetail, LoadedTemplateSet, TemplateCardVM, SavedBuild, StatSextet, TemplateDiff } from './lib/types'
 import {
   buildAnilNodes, computeSet, pickItem, pickMoveset,
   movesDetailedFromPool, familyOrderedSpeciesKeys
 } from './lib/engine'
-import { findRootInternalName, allAnilSpecies, getAnilAbilityDetail } from './lib/anilData'
+import { findRootInternalName, getAnilAbilityDetail } from './lib/anilData'
 import { resolveCompetitiveTemplate, buildGameData } from './lib/templateRegistry'
+import { selectClosestTemplate, diffSavedVsTemplate } from './lib/templateDiff'
+import { scoreBuild, qualityTier, type QualityTier } from './lib/buildScore'
 import { toCardVM, heuristicToCardVM } from './lib/templateView'
 import { PHYSICAL_BOOSTS, SPECIAL_BOOSTS } from './lib/constants'
 import { hudThemeVars } from './hudTheme'
 import { loadInternalNames, markInternalName, saveInternalNames } from './lib/collection'
-import { fetchTeamDetail, type TeamSummary } from './lib/team'
+import { fetchTeamDetail } from './lib/team'
+import { useSaveFile } from './composables/useSaveFile'
+import { usePokemonDrafts } from './composables/usePokemonDrafts'
 import AppHeader from './components/AppHeader.vue'
-import DexRail from './components/DexRail.vue'
+import PokedexBrowse from './components/dex/PokedexBrowse.vue'
 import PokemonSheet from './components/sheet/PokemonSheet.vue'
-import SaveView, { type RosterEntry } from './components/SaveView.vue'
-import TeamSidebar from './components/save/TeamSidebar.vue'
-import SaveRosterSidebar from './components/save/SaveRosterSidebar.vue'
-import type { TeamSlotMon } from './components/save/TeamSlot.vue'
+import ImportSaveView from './components/save/ImportSaveView.vue'
+import ConfigureView from './components/configure/ConfigureView.vue'
+import ReviewChangesView from './components/review/ReviewChangesView.vue'
+import FlowRail, { type FlowStep } from './components/save/FlowRail.vue'
 
 const DEX_SEEN_STORAGE_KEY = 'anil-dex.seen-species.v1'
 
-const view = ref<'dex' | 'save'>('dex')
-const saveDetailOpen = ref(false)
+type AppView = 'pokedex' | 'pokemon-detail' | 'import-save' | 'configure-pokemon' | 'review-changes'
+
+const view = ref<AppView>('pokedex')
+const detailContext = ref<'pokedex' | 'save'>('pokedex')
 const searchTerm = ref('')
 const seenInternalNames = ref(loadInternalNames(DEX_SEEN_STORAGE_KEY))
-const ownedInternalNames = ref<string[]>([])
-const saveRoster = ref<RosterEntry[]>([])
-const saveTeamMons = ref<Array<TeamSlotMon | null>>([])
-const saveFileName = ref('')
-const saveSummaries = ref<TeamSummary[]>([])
+
+const {
+  roster: saveRoster,
+  fileName: saveFileName,
+  summaries: saveSummaries,
+  bytes: saveBytes,
+  saveId,
+  ownedInternalNames,
+  loaded: saveLoaded,
+  status: saveStatus,
+  statusMessage: saveStatusMessage,
+  readFile: onImportFile
+} = useSaveFile()
+
+const drafts = usePokemonDrafts()
+watch(saveId, id => { if (id) void drafts.loadSave(id) })
+
+const importSteps: FlowStep[] = [
+  { label: 'Seleccionar archivo', state: 'active' },
+  { label: 'Analizar equipo y cajas', state: 'todo' },
+  { label: 'Configurar Pokémon', state: 'todo' }
+]
+const configureSteps: FlowStep[] = [
+  { label: 'Partida analizada', state: 'done' },
+  { label: 'Configurar Pokémon', state: 'current' },
+  { label: 'Revisar cambios', state: 'todo' },
+  { label: 'Generar .rxdata', state: 'todo' },
+  { label: 'Descargar copia', state: 'todo' }
+]
+
+const wideLayout = computed(() => view.value !== 'import-save' && view.value !== 'configure-pokemon')
+
 const saveDetailEvs = ref<number[] | null>(null)
 const saveDetailIvs = ref<number[] | null>(null)
+const saveDetailBuild = ref<SavedBuild | null>(null)
 let saveDetailToken = 0
 
 /** Selección independiente por vista: la Pokédex y "Mi partida" no comparten el Pokémon activo. */
@@ -98,18 +132,27 @@ async function selectNode(list: DexNode[], newIdx: number) {
   }
 }
 
+const navSection = computed<'pokedex' | 'save'>(() => {
+  if (view.value === 'pokedex') return 'pokedex'
+  if (view.value === 'pokemon-detail') return detailContext.value === 'save' ? 'save' : 'pokedex'
+  return 'save'
+})
+
 function onRailSelect(internalName: string) {
-  const inSave = view.value === 'save'
-  if (inSave) {
-    saveDetailOpen.value = true
+  if (navSection.value === 'save') {
+    view.value = 'pokemon-detail'
+    detailContext.value = 'save'
     loadSaveDetail(internalName)
+    searchAndSelect(internalName, true)
+  } else {
+    searchAndSelect(internalName)
   }
-  searchAndSelect(internalName, inSave)
 }
 
 function loadSaveDetail(internalName: string) {
   saveDetailEvs.value = null
   saveDetailIvs.value = null
+  saveDetailBuild.value = null
   const summary = saveSummaries.value.find(s => s.internalName === internalName)
   if (!summary) return
   const token = ++saveDetailToken
@@ -118,27 +161,68 @@ function loadSaveDetail(internalName: string) {
       if (token !== saveDetailToken) return
       saveDetailEvs.value = detail.evs
       saveDetailIvs.value = detail.ivs
+      saveDetailBuild.value = {
+        internalName,
+        natureKey: (detail.natureKey ?? '').toUpperCase(),
+        abilityId: detail.abilityId ?? '',
+        itemId: detail.itemId ?? '',
+        evs: detail.evs.slice(0, 6) as StatSextet,
+        ivs: detail.ivs.slice(0, 6) as StatSextet,
+        moveIds: detail.currentMoves.map(m => m.name)
+      }
     })
     .catch(() => { /* datos de partida opcionales */ })
 }
 
-function onViewChange(v: 'dex' | 'save') {
-  view.value = v
-  if (v === 'dex') {
-    saveDetailOpen.value = false
+const saveQuality = computed<{ score: number; tier: QualityTier; entry: LoadedTemplateSet['entries'][number] } | null>(() => {
+  const build = saveDetailBuild.value
+  const set = loadedTemplateSet.value
+  if (!build || !set || detailContext.value !== 'save') return null
+  const match = selectClosestTemplate(build, set, templateGameData)
+  if (!match) return null
+  const score = scoreBuild(build, match.entry)
+  return { score, tier: qualityTier(score), entry: match.entry }
+})
+
+const saveComparison = computed<TemplateDiff | null>(() => {
+  const build = saveDetailBuild.value
+  const q = saveQuality.value
+  if (!build || !q) return null
+  return diffSavedVsTemplate(build, q.entry, templateGameData)
+})
+
+function onNav(section: 'pokedex' | 'save') {
+  if (section === 'pokedex') {
+    view.value = 'pokedex'
     searchAndSelect(dexTarget.value)
-  } else if (saveTarget.value) {
-    saveDetailOpen.value = true
-    loadSaveDetail(saveTarget.value)
-    searchAndSelect(saveTarget.value, true)
   } else {
-    saveDetailOpen.value = false
+    view.value = saveLoaded.value ? 'configure-pokemon' : 'import-save'
   }
 }
 
-async function searchAndSelect(internalName: string, keepSaveView = false) {
+watch(saveLoaded, loaded => {
+  if (loaded && view.value === 'import-save') view.value = 'configure-pokemon'
+})
+
+function onDetailBack() {
+  view.value = detailContext.value === 'save' ? 'configure-pokemon' : 'pokedex'
+}
+
+const configureInitialKey = ref<string | null>(null)
+
+function onConfigDetail(instanceKey: string) {
+  const entry = saveRoster.value.find(r => r.instanceKey === instanceKey)
+  if (entry) onRailSelect(entry.internalName)
+}
+
+function onReviewEdit(instanceKey: string) {
+  configureInitialKey.value = instanceKey
+  view.value = 'configure-pokemon'
+}
+
+async function searchAndSelect(internalName: string, keepSaveView = false, dest: AppView = 'pokedex') {
   if (keepSaveView) saveTarget.value = internalName
-  else { view.value = 'dex'; dexTarget.value = internalName }
+  else { view.value = dest; dexTarget.value = internalName }
   loading.value = true
   errorMsg.value = ''
   nodes.value = null
@@ -159,12 +243,14 @@ function onFormDot(i: number) {
   if (nodes.value && i >= 0 && i < nodes.value.length) selectNode(nodes.value, i)
 }
 
-/** Nombre a resaltar en el índice: la especie base cuando el nodo activo es una mega/forma. */
-const railActiveName = computed(() => {
-  const n = activeNode.value
-  if (!n) return null
-  return n.stageKind === 'mega' ? (nodes.value?.[0]?.internalName ?? n.internalName) : n.internalName
-})
+function onHeaderSelect(internalName: string) {
+  if (navSection.value === 'save') onRailSelect(internalName)
+  else onDexOpen(internalName)
+}
+function onDexOpen(internalName: string) {
+  detailContext.value = 'pokedex'
+  void searchAndSelect(internalName, false, 'pokemon-detail')
+}
 
 /** Mismo orden que el índice (líneas evolutivas juntas) para navegar Anterior / Siguiente. */
 const speciesOrder = familyOrderedSpeciesKeys()
@@ -178,8 +264,8 @@ const stripNextName = computed(() => {
   const i = speciesOrder.indexOf(activeNode.value.internalName)
   return i >= 0 && i < speciesOrder.length - 1 ? speciesOrder[i + 1] : null
 })
-function onStripPrev() { if (stripPrevName.value) searchAndSelect(stripPrevName.value) }
-function onStripNext() { if (stripNextName.value) searchAndSelect(stripNextName.value) }
+function onStripPrev() { if (stripPrevName.value) searchAndSelect(stripPrevName.value, false, 'pokemon-detail') }
+function onStripNext() { if (stripNextName.value) searchAndSelect(stripNextName.value, false, 'pokemon-detail') }
 
 /** Anterior / Siguiente dentro del equipo y las cajas de la partida, en el orden del roster. */
 const saveOrder = computed(() => saveRoster.value.map(r => r.internalName))
@@ -195,15 +281,6 @@ const saveNextName = computed(() => {
 })
 function onSavePrev() { if (savePrevName.value) onRailSelect(savePrevName.value) }
 function onSaveNext() { if (saveNextName.value) onRailSelect(saveNextName.value) }
-
-function onOwnedChange(internalNames: string[]) { ownedInternalNames.value = internalNames }
-function onRosterChange(roster: RosterEntry[]) { saveRoster.value = roster }
-function onTeamMons(slots: Array<TeamSlotMon | null>) { saveTeamMons.value = slots }
-function onFileName(name: string) { saveFileName.value = name }
-function onSummariesChange(list: TeamSummary[]) { saveSummaries.value = list }
-
-const totalSpecies = Object.keys(allAnilSpecies()).length
-const ownedCount = computed(() => ownedInternalNames.value.length)
 
 function pad3(n: number | null) { return n != null ? '#' + String(n).padStart(3, '0') : 'Añil' }
 const dexCrumbs = computed(() => {
@@ -224,38 +301,38 @@ searchAndSelect('BULBASAUR')
   <div class="hud-shell" :style="themeVars">
     <div class="hud-container">
       <AppHeader
-        :view="view"
-        @update:view="onViewChange"
-        @select="searchAndSelect"
+        :view="navSection"
+        @update:view="onNav"
+        @select="onHeaderSelect"
         @search="searchTerm = $event"
       />
 
-      <div class="hud-body">
-        <DexRail
-          v-if="view === 'dex'"
-          :active-internal-name="railActiveName"
-          :search-term="searchTerm"
-          @select="onRailSelect"
+      <div class="hud-body" :class="{ 'hud-body--wide': wideLayout }">
+        <FlowRail
+          v-if="view === 'import-save'"
+          eyebrow="Mi partida"
+          title="Importa y configura tu partida"
+          subtitle="Carga el archivo una sola vez. Al terminar el análisis pasas directamente a configurar los Pokémon detectados."
+          :steps="importSteps"
         />
-        <SaveRosterSidebar
-          v-else-if="saveRoster.length"
-          :roster="saveRoster"
-          :active-internal-name="activeNode?.internalName || null"
-          :owned-count="ownedCount"
-          :total="totalSpecies"
-          @select="onRailSelect"
-        />
-        <TeamSidebar
-          v-else
-          :slots="saveTeamMons"
+        <FlowRail
+          v-else-if="view === 'configure-pokemon'"
+          eyebrow="Mi partida"
+          title="Configurar Pokémon"
           :file-name="saveFileName || null"
-          read-state="Offline"
-          :active-internal-name="activeNode?.internalName || null"
-          @select="onRailSelect"
+          steps-label="Flujo de configuración"
+          :steps="configureSteps"
         />
 
         <main class="hud-main">
-          <template v-if="view === 'dex'">
+          <PokedexBrowse
+            v-if="view === 'pokedex'"
+            :owned-internal-names="ownedInternalNames"
+            :search-term="searchTerm"
+            @open="onDexOpen"
+          />
+
+          <template v-else-if="view === 'pokemon-detail' && detailContext === 'pokedex'">
             <div v-if="loading && !nodes" class="hud-status">Buscando…</div>
             <div v-else-if="errorMsg && !nodes" class="hud-status is-error">{{ errorMsg }}</div>
             <PokemonSheet
@@ -269,13 +346,14 @@ searchAndSelect('BULBASAUR')
               :crumbs="dexCrumbs"
               :prev-available="!!stripPrevName"
               :next-available="!!stripNextName"
+              @back="view = 'pokedex'"
               @form-select="onFormDot"
               @prev="onStripPrev"
               @next="onStripNext"
             />
           </template>
 
-          <template v-else-if="saveDetailOpen">
+          <template v-else-if="view === 'pokemon-detail' && detailContext === 'save'">
             <div v-if="loading && !nodes" class="hud-status">Buscando…</div>
             <div v-else-if="errorMsg && !nodes" class="hud-status is-error">{{ errorMsg }}</div>
             <PokemonSheet
@@ -289,32 +367,48 @@ searchAndSelect('BULBASAUR')
               :crumbs="saveCrumbs"
               :save-evs="saveDetailEvs"
               :save-ivs="saveDetailIvs"
+              :save-quality="saveQuality"
+              :save-comparison="saveComparison"
               :prev-available="!!savePrevName"
               :next-available="!!saveNextName"
-              @back="saveDetailOpen = false"
+              @back="onDetailBack"
               @form-select="onFormDot"
               @prev="onSavePrev"
               @next="onSaveNext"
             />
           </template>
 
-          <div v-show="view === 'save'">
-            <SaveView
-              v-show="view === 'save' && !saveDetailOpen"
-              @owned-change="onOwnedChange"
-              @roster-change="onRosterChange"
-              @team-mons="onTeamMons"
-              @file-name="onFileName"
-              @summaries-change="onSummariesChange"
-              @select="onRailSelect"
-            />
-          </div>
+          <ImportSaveView
+            v-else-if="view === 'import-save'"
+            :status="saveStatus"
+            :file-name="saveFileName || null"
+            :status-message="saveStatusMessage"
+            @file="onImportFile"
+          />
+
+          <ConfigureView
+            v-else-if="view === 'configure-pokemon'"
+            :summaries="saveSummaries"
+            :save-id="saveId"
+            :drafts="drafts"
+            :file-name="saveFileName"
+            :initial-key="configureInitialKey"
+            @open-detail="onConfigDetail"
+            @review="view = 'review-changes'"
+            @change-file="view = 'import-save'"
+          />
+
+          <ReviewChangesView
+            v-else-if="view === 'review-changes'"
+            :summaries="saveSummaries"
+            :drafts="drafts"
+            :bytes="saveBytes"
+            @back="view = 'configure-pokemon'"
+            @edit="onReviewEdit"
+            @done="view = 'import-save'"
+          />
         </main>
       </div>
-
-      <footer class="hud-foot-note">
-        Sprites, stats, evoluciones y movepool: PokéAPI · Sets competitivos calculados 100% offline, sin IA en tiempo real
-      </footer>
     </div>
   </div>
 </template>
