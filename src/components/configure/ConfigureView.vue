@@ -26,7 +26,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'open-detail', instanceKey: string): void
+  (e: 'open-detail', instanceKey: string, order: string[]): void
   (e: 'review'): void
   (e: 'change-file'): void
 }>()
@@ -305,7 +305,7 @@ function onToggleFavorite(internalName: string): void {
 }
 
 function onOpenDetail(): void {
-  if (activeKey.value) emit('open-detail', activeKey.value)
+  if (activeKey.value) emit('open-detail', activeKey.value, filtered.value.map(r => r.internalName))
 }
 </script>
 

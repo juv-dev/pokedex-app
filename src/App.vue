@@ -138,7 +138,13 @@ const navSection = computed<'pokedex' | 'save'>(() => {
   return 'save'
 })
 
-function onRailSelect(internalName: string) {
+/** Orden activo al abrir la ficha desde Configurar sets: respeta el filtro/orden que ve
+ *  el usuario en ese momento en vez del orden crudo del roster. Se limpia al navegar por
+ *  fuera de ese contexto (búsqueda del header, etc.) para no dejar un orden obsoleto. */
+const configureOrder = ref<string[] | null>(null)
+
+function onRailSelect(internalName: string, order: string[] | null = null) {
+  configureOrder.value = order
   if (navSection.value === 'save') {
     view.value = 'pokemon-detail'
     detailContext.value = 'save'
@@ -210,9 +216,9 @@ function onDetailBack() {
 
 const configureInitialKey = ref<string | null>(null)
 
-function onConfigDetail(instanceKey: string) {
+function onConfigDetail(instanceKey: string, order: string[]) {
   const entry = saveRoster.value.find(r => r.instanceKey === instanceKey)
-  if (entry) onRailSelect(entry.internalName)
+  if (entry) onRailSelect(entry.internalName, order)
 }
 
 function onReviewEdit(instanceKey: string) {
@@ -267,8 +273,9 @@ const stripNextName = computed(() => {
 function onStripPrev() { if (stripPrevName.value) searchAndSelect(stripPrevName.value, false, 'pokemon-detail') }
 function onStripNext() { if (stripNextName.value) searchAndSelect(stripNextName.value, false, 'pokemon-detail') }
 
-/** Anterior / Siguiente dentro del equipo y las cajas de la partida, en el orden del roster. */
-const saveOrder = computed(() => saveRoster.value.map(r => r.internalName))
+/** Anterior / Siguiente dentro del equipo y las cajas de la partida: respeta el orden filtrado
+ *  de Configurar sets cuando la ficha se abrió desde ahí, y si no cae al orden del roster. */
+const saveOrder = computed(() => configureOrder.value ?? saveRoster.value.map(r => r.internalName))
 const savePrevName = computed(() => {
   if (!activeNode.value) return null
   const i = saveOrder.value.indexOf(activeNode.value.internalName)
@@ -279,8 +286,8 @@ const saveNextName = computed(() => {
   const i = saveOrder.value.indexOf(activeNode.value.internalName)
   return i >= 0 && i < saveOrder.value.length - 1 ? saveOrder.value[i + 1] : null
 })
-function onSavePrev() { if (savePrevName.value) onRailSelect(savePrevName.value) }
-function onSaveNext() { if (saveNextName.value) onRailSelect(saveNextName.value) }
+function onSavePrev() { if (savePrevName.value) onRailSelect(savePrevName.value, configureOrder.value) }
+function onSaveNext() { if (saveNextName.value) onRailSelect(saveNextName.value, configureOrder.value) }
 
 function pad3(n: number | null) { return n != null ? '#' + String(n).padStart(3, '0') : 'Añil' }
 const dexCrumbs = computed(() => {
