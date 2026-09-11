@@ -384,12 +384,27 @@ export async function buildAnilNodes(internalName: string, isRoot: boolean, spec
     }
   }
 
-  for (const evo of sp.evolutions) {
-    const label = evoMethodLabel(evo.method, evo.param)
-    const childList = await buildAnilNodesFromEdge(evo.target, label, map, visited, internalName)
+  for (const edge of anilEvolutionEdges(sp)) {
+    const childList = await buildAnilNodesFromEdge(edge.target, edge.label, map, visited, internalName)
     list = list.concat(childList)
   }
   return list
+}
+
+/**
+ * Aristas de evolución de una especie: las de la forma base (`evolutions`) más las
+ * exclusivas de una forma regional/especial (`formEvolutions`, ej. Corsola de Galar → Cursola),
+ * etiquetadas con el nombre de esa forma para no confundirlas con la evolución de la forma base.
+ */
+export function anilEvolutionEdges(sp: AnilSpecies): Array<{ target: string; label: string }> {
+  const base = sp.evolutions.map(evo => ({ target: evo.target, label: evoMethodLabel(evo.method, evo.param) }))
+  const formGated = (sp.formEvolutions ?? []).flatMap(fe =>
+    fe.evolutions.map(evo => {
+      const label = evoMethodLabel(evo.method, evo.param)
+      return { target: evo.target, label: fe.formName ? `${label} (${fe.formName})` : label }
+    })
+  )
+  return [...base, ...formGated]
 }
 
 async function buildAnilNodesFromEdge(internalName: string, evoLabel: string, speciesMap: Map<string, string>, visited: Set<string>, parentInternalName: string): Promise<DexNode[]> {
@@ -420,9 +435,8 @@ async function buildAnilNodesFromEdge(internalName: string, evoLabel: string, sp
     }
   }
 
-  for (const evo of sp.evolutions) {
-    const label = evoMethodLabel(evo.method, evo.param)
-    const childList = await buildAnilNodesFromEdge(evo.target, label, speciesMap, visited, internalName)
+  for (const edge of anilEvolutionEdges(sp)) {
+    const childList = await buildAnilNodesFromEdge(edge.target, edge.label, speciesMap, visited, internalName)
     list = list.concat(childList)
   }
   return list

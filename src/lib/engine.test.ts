@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
   classifyRole, pickNature, natureKeyForRole, pickEVs, pickIVs, pickItem, pickItemKeys, slugify,
-  capitalizeWords, statsToArr, pickAbility, pickMoveset, movesDetailedFromPool, loadSpeciesIndex
+  capitalizeWords, statsToArr, pickAbility, pickMoveset, movesDetailedFromPool, loadSpeciesIndex,
+  anilEvolutionEdges
 } from './engine'
 import { natureSentence } from './nature'
+import { getAnilSpecies } from './anilData'
 import type { StatMap, MoveDetail } from './types'
 import type { AnilMoveData } from './anilData'
 
@@ -25,6 +27,28 @@ describe('classifyRole', () => {
   it('should classify Bulbasaur as a special wallbreaker', () => {
     const { role } = classifyRole(stats(45, 49, 49, 65, 65, 45))
     expect(role).toBe('breaker-special')
+  })
+})
+
+describe('anilEvolutionEdges', () => {
+  it('should include the Galar-form-only evolution to Cursola for Corsola', () => {
+    const corsola = getAnilSpecies('CORSOLA')!
+    const edges = anilEvolutionEdges(corsola)
+    expect(edges).toHaveLength(1)
+    expect(edges[0].target).toBe('CURSOLA')
+    expect(edges[0].label).toContain('Forma Galar')
+  })
+
+  it('should return no edges for a species without base or form evolutions', () => {
+    const cursola = getAnilSpecies('CURSOLA')!
+    expect(anilEvolutionEdges(cursola)).toEqual([])
+  })
+
+  it('should keep the base-form evolution for a species without form-gated evolutions', () => {
+    const bulbasaur = getAnilSpecies('BULBASAUR')!
+    const edges = anilEvolutionEdges(bulbasaur)
+    expect(edges).toHaveLength(1)
+    expect(edges[0].target).toBe('IVYSAUR')
   })
 })
 
