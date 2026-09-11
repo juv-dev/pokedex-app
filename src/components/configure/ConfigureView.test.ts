@@ -125,7 +125,22 @@ describe('ConfigureView', () => {
     const { wrapper, idle } = mountView([summary])
     await selectFirst(wrapper, idle)
     await wrapper.get('.cfg-detail-link').trigger('click')
-    expect(wrapper.emitted('open-detail')?.[0]).toEqual([instanceKeyOf(summary)])
+    expect(wrapper.emitted('open-detail')?.[0]).toEqual([instanceKeyOf(summary), [summary.internalName]])
+  })
+
+  it('should emit the currently filtered order, not the raw roster order, alongside open-detail', async () => {
+    const summaries = [
+      mon({ internalName: 'CHARIZARD', inParty: true }),
+      mon({ internalName: 'PIKACHU', boxSlot: 1 }),
+      mon({ internalName: 'BLASTOISE', boxSlot: 2 })
+    ]
+    const { wrapper, idle } = mountView(summaries)
+    await wrapper.get('.cfg-search input').setValue('pika')
+    await idle()
+    await wrapper.get('.cfg-card').trigger('click')
+    await idle()
+    await wrapper.get('.cfg-detail-link').trigger('click')
+    expect(wrapper.emitted('open-detail')?.[0]).toEqual([instanceKeyOf(summaries[1]), ['PIKACHU']])
   })
 
   it('should toggle a favorite from the card heart', async () => {
