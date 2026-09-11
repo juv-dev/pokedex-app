@@ -6,11 +6,9 @@ export type DropzoneState = 'idle' | 'loading' | 'success' | 'error'
 const props = withDefaults(defineProps<{
   state?: DropzoneState
   statusMsg?: string | null
-  path?: string
 }>(), {
   state: 'idle',
-  statusMsg: null,
-  path: '%AppData%\\Roaming\\Pokemon Anil\\Partida 1.rxdata'
+  statusMsg: null
 })
 
 const emit = defineEmits<{ (e: 'file', file: File): void }>()
@@ -58,11 +56,11 @@ function onDrop(e: DragEvent) {
       <span v-else class="mp-drop-spinner"></span>
     </span>
 
-    <h2 class="mp-drop-title">{{ busy ? 'Leyendo tu partida…' : '¿Qué Pokémon tienes en tu partida?' }}</h2>
+    <h2 class="mp-drop-title">{{ busy ? 'Leyendo tu partida…' : 'Descubre qué Pokémon tienes en tu partida' }}</h2>
     <p class="mp-drop-text">
       {{ busy
         ? 'Analizando el archivo en tu navegador. Puede tardar unos segundos; no cierres esta pestaña.'
-        : 'Arrastra tu archivo aquí o selecciónalo. Se procesa en tu navegador y no se envía a ningún servidor.' }}
+        : 'Arrastra aquí tu archivo o selecciónalo para detectar automáticamente tu equipo, cajas y datos competitivos.' }}
     </p>
 
     <template v-if="!busy">
@@ -73,7 +71,33 @@ function onDrop(e: DragEvent) {
         Elegir archivo de partida
       </button>
 
-      <p class="mp-drop-path">{{ path }}</p>
+      <ul class="mp-drop-hints">
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M5 3h9l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M9 14l2 2 3.5-3.5" />
+          </svg>
+          Solo .rxdata
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 8.8a15 15 0 0 1 20 0M5 12.7a10 10 0 0 1 14 0M8.5 16.4a5 5 0 0 1 7 0M12 20h.01M3 3l18 18" />
+          </svg>
+          Funciona sin conexión
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+          Tu archivo permanece privado
+        </li>
+      </ul>
+
+      <p class="mp-drop-next">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+        Siguiente: Configurar Pokémon por equipo o caja
+      </p>
     </template>
 
     <input

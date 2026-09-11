@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'fs';
 
-const PBS = 'C:/Jesús/Game/POKEMON ANIL V4.13/Pokemon Anil V4.13/PBS/';
-const OUT = 'C:/Developers/Github/anil-dex/src/data/';
+const PBS = process.env.ANIL_PBS || 'C:/Jesús/Game/POKEMON ANIL V4.13/Pokemon Anil V4.13/PBS/';
+const OUT = process.env.ANIL_OUT || 'C:/Developers/Github/pokedex-app/src/data/';
 
 function splitList(raw) {
   if (!raw) return [];
@@ -96,12 +96,30 @@ writeFileSync(OUT + 'anil-item-numbers.json', JSON.stringify(itemNumbers));
 writeFileSync(OUT + 'anil-item-details.json', JSON.stringify(itemDetails));
 console.log('items:', itemBlocks.length);
 
-// ---- pokemon_forms.txt: mega evolutions ----
+function parseEvolutions(raw) {
+  if (!raw) return [];
+  const parts = raw.split(',');
+  const out = [];
+  for (let i = 0; i + 1 < parts.length; i += 3) {
+    out.push({ target: parts[i], method: parts[i + 1], param: parts[i + 2] || null });
+  }
+  return out;
+}
+
+// ---- pokemon_forms.txt: mega evolutions + form-specific evolutions (regional/Hisui/Paldea) ----
 const formsText = readFileSync(PBS + 'pokemon_forms.txt', 'utf8');
 const formBlocks = parseBlocks(formsText);
 const megas = {}; // speciesInternal -> [{formName, megaStone, megaStoneName, baseStats, abilities}]
+const formEvolutions = {}; // speciesInternal -> [{form, formName, evolutions:[{target,method,param}]}]
 formBlocks.forEach(b => {
   const [species, formIdx] = b.id.split(',');
+  if (b.fields.Evolutions && b.fields.Evolutions.trim()) {
+    (formEvolutions[species] = formEvolutions[species] || []).push({
+      form: formIdx ? parseInt(formIdx, 10) : 0,
+      formName: b.fields.FormName || null,
+      evolutions: parseEvolutions(b.fields.Evolutions)
+    });
+  }
   if (!b.fields.MegaStone && !b.fields.MegaMove) return;
   const entry = {
     formName: b.fields.FormName || null,
@@ -124,15 +142,6 @@ console.log('species with mega forms:', Object.keys(megas).length);
 const pokeText = readFileSync(PBS + 'pokemon.txt', 'utf8');
 const pokeBlocks = parseBlocks(pokeText);
 const pokedex = {};
-function parseEvolutions(raw) {
-  if (!raw) return [];
-  const parts = raw.split(',');
-  const out = [];
-  for (let i = 0; i + 1 < parts.length; i += 3) {
-    out.push({ target: parts[i], method: parts[i + 1], param: parts[i + 2] || null });
-  }
-  return out;
-}
 pokeBlocks.forEach(b => {
   const f = b.fields;
   if (!f.BaseStats) return;
@@ -158,6 +167,7 @@ pokeBlocks.forEach(b => {
     genderRatio: f.GenderRatio || null,
     baseExp: f.BaseExp ? parseInt(f.BaseExp, 10) : null,
     evolutions: parseEvolutions(f.Evolutions),
+    formEvolutions: formEvolutions[b.id] || [],
     megas: megas[b.id] || [],
     tutorMoves: splitList(f.TutorMoves),
     eggMoves: splitList(f.EggMoves),

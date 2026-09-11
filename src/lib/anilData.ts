@@ -10,6 +10,7 @@ import itemDetailsRaw from '../data/anil-item-details.json'
 import anilSchemaRaw from '../data/anil-schema.json'
 
 export interface AnilEvolution { target: string; method: string; param: string | null }
+export interface AnilFormEvolution { form: number; formName: string | null; evolutions: AnilEvolution[] }
 export interface AnilLevelMove { level: number; move: string }
 export interface AnilMegaForm {
   formName: string | null
@@ -36,6 +37,7 @@ export interface AnilSpecies {
   genderRatio: string | null
   baseExp: number | null
   evolutions: AnilEvolution[]
+  formEvolutions?: AnilFormEvolution[]
   megas: AnilMegaForm[]
   tutorMoves: string[]
   eggMoves: string[]
@@ -118,6 +120,19 @@ export function getAnilSpecies(internalName: string): AnilSpecies | null {
 }
 export function allAnilSpecies(): Record<string, AnilSpecies> {
   return pokedex
+}
+
+/** Evoluciones que aplican a una forma concreta: las propias de la forma más las de la forma base. */
+export function evolutionsForForm(internalName: string, form = 0): AnilEvolution[] {
+  const sp = pokedex[internalName]
+  if (!sp) return []
+  const own = sp.formEvolutions?.find(f => f.form === form)?.evolutions ?? []
+  return [...sp.evolutions, ...own]
+}
+
+/** ¿Este ejemplar (especie + forma) todavía puede evolucionar? Ignora entradas con método `None`. */
+export function canEvolve(internalName: string, form = 0): boolean {
+  return evolutionsForForm(internalName, form).some(e => !!e.target && e.method !== 'None')
 }
 
 let preEvoIndexCache: Map<string, string> | null = null

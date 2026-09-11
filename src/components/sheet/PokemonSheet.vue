@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { DexNode, TemplateCardVM, TemplateGameData } from '../../lib/types'
+import type { DexNode, TemplateCardVM, TemplateGameData, TemplateDiff } from '../../lib/types'
+import type { QualityTier } from '../../lib/buildScore'
 import { NATURE_TABLE } from '../../lib/constants'
 import { getAnilSpecies } from '../../lib/anilData'
 import PokemonSummary from './PokemonSummary.vue'
@@ -10,6 +11,8 @@ import StatBlock from './StatBlock.vue'
 import MoveList from './MoveList.vue'
 import EvoLine from './EvoLine.vue'
 import MegaEvolution from './MegaEvolution.vue'
+import SetQualityBadge from './SetQualityBadge.vue'
+import SetComparison from './SetComparison.vue'
 
 /**
  * Ficha unificada (ref. pen.dev C3U3T / pB0nc): un solo layout para Información + Estadísticas +
@@ -25,6 +28,8 @@ const props = defineProps<{
   crumbs: string[]
   saveEvs?: number[] | null
   saveIvs?: number[] | null
+  saveQuality?: { score: number; tier: QualityTier } | null
+  saveComparison?: TemplateDiff | null
   prevAvailable?: boolean
   nextAvailable?: boolean
 }>()
@@ -70,6 +75,10 @@ const evoInfo = computed(() => {
 const lastCrumb = computed(() => props.crumbs[props.crumbs.length - 1] ?? '')
 const headCrumbs = computed(() => props.crumbs.slice(0, -1))
 const showNav = computed(() => props.prevAvailable || props.nextAvailable)
+
+const improvementCount = computed(() =>
+  props.saveComparison ? props.saveComparison.rows.filter(r => r.status !== 'match').length : undefined
+)
 </script>
 
 <template>
@@ -101,6 +110,11 @@ const showNav = computed(() => props.prevAvailable || props.nextAvailable)
         <CompetitivePanel :cards="cards" :base-stats="baseStatsArr" :evo-info="evoInfo" />
       </div>
 
+      <SetQualityBadge
+        v-if="context === 'save' && saveQuality"
+        :score="saveQuality.score" :tier="saveQuality.tier" :improvements="improvementCount"
+      />
+
       <div class="sheet-row-lower" :class="hasMegas ? 'has-mega' : ''">
         <GeneralInfo :node="node" />
         <StatBlock
@@ -115,8 +129,16 @@ const showNav = computed(() => props.prevAvailable || props.nextAvailable)
             :card="activeCard" :game-data="gameData" :node-types="node.types"
             :title="context === 'save' ? 'Movimientos del set' : 'Movimientos'"
           />
+          <SetComparison v-if="context === 'save' && saveComparison" :diff="saveComparison" />
         </div>
       </div>
+
+      <p v-if="context === 'save'" class="sheet-legend">
+        <span class="sheet-legend-k">Calidad del set</span>
+        <span class="sheet-legend-item is-optimo">Óptimo · 90–100</span>
+        <span class="sheet-legend-item is-viable">Viable · 70–89</span>
+        <span class="sheet-legend-item is-ajustes">Requiere ajustes · 0–69</span>
+      </p>
 
       <div v-if="hasFormsRow" class="sheet-forms" :class="{ 'is-split': hasEvoLine && hasMegas }">
         <EvoLine v-if="hasEvoLine" :nodes="nodes" :active-idx="idx" @select="i => emit('form-select', i)" />

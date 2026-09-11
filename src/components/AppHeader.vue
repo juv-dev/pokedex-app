@@ -6,9 +6,9 @@ import { loadSpeciesIndex, type SpeciesIndexEntry } from '../lib/engine'
  * Cabecera del `Añil Dex - HUD.dc.html`: distintivo ◉ AÑIL DEX, conmutador Pokédex | Mi partida
  * y campo "Buscar Pokémon…". La búsqueda mantiene su desplegable real (nombre o número).
  */
-const props = defineProps<{ view: 'dex' | 'save' }>()
+const props = defineProps<{ view: 'pokedex' | 'save' }>()
 const emit = defineEmits<{
-  (e: 'update:view', view: 'dex' | 'save'): void
+  (e: 'update:view', view: 'pokedex' | 'save'): void
   (e: 'select', internalName: string): void
   (e: 'search', term: string): void
 }>()
@@ -85,13 +85,7 @@ function onFocusOut(e: FocusEvent) {
 <template>
   <header class="hud-header">
     <div class="hud-brand">
-      <div class="hud-brand-badge" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M3 12h5.5M15.5 12H21" />
-          <circle cx="12" cy="12" r="3.1" fill="currentColor" stroke="none" />
-        </svg>
-      </div>
+      <div class="hud-brand-badge" aria-hidden="true">◉</div>
       <div>
         <div class="hud-brand-name">AÑIL DEX</div>
         <div class="hud-brand-sub">Pokédex en español</div>
@@ -99,7 +93,7 @@ function onFocusOut(e: FocusEvent) {
     </div>
 
     <div class="hud-toggle">
-      <button type="button" :class="{ 'is-active': props.view === 'dex' }" @click="emit('update:view', 'dex')">Pokédex</button>
+      <button type="button" :class="{ 'is-active': props.view === 'pokedex' }" @click="emit('update:view', 'pokedex')">Pokédex</button>
       <button type="button" :class="{ 'is-active': props.view === 'save' }" @click="emit('update:view', 'save')">Mi partida</button>
     </div>
 
@@ -109,7 +103,7 @@ function onFocusOut(e: FocusEvent) {
           <circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path>
         </svg>
         <input
-          v-model="query" type="text" placeholder="Buscar Pokémon…" autocomplete="off"
+          v-model="query" type="text" placeholder="Buscar por nombre o número..." autocomplete="off"
           aria-label="Buscar Pokémon por nombre o número"
           @input="onInput"
           @focus="dropOpen = true"

@@ -259,6 +259,167 @@ export async function applyRecommendedSets(bytes: Uint8Array, opts: ApplyOptions
   }
 }
 
+export interface DraftLike {
+  instanceKey: string
+  speciesId: string
+  selectedFormId: string
+  recommendedSet: RecommendedSet
+}
+
+export interface DraftChangeRecord {
+  instanceKey: string
+  species: string
+  location: string
+  formTo: string
+  tier: string
+  applied: boolean
+  skippedReason: string | null
+}
+
+export interface DraftApplyResult {
+  output: Uint8Array
+  applied: number
+  records: DraftChangeRecord[]
+  diffs: string[]
+  verified: boolean
+}
+
+function pidFromKey(instanceKey: string): number | null {
+  const m = /^pid:(\d+)$/.exec(instanceKey)
+  return m ? Number(m[1]) : null
+}
+
+function locFromKey(instanceKey: string): { box: number | null; slot: number | null } | null {
+  const box = /^loc:box(\d+):(\d+):/.exec(instanceKey)
+  if (box) return { box: Number(box[1]), slot: Number(box[2]) }
+  if (/^loc:team:/.test(instanceKey)) return { box: null, slot: null }
+  return null
+}
+
+function applySetToNode(node: MNode, set: RecommendedSet, getSym: (n: string) => MNode): void {
+  const evNode = ivarGet(node, '@ev')
+  const ivNode = ivarGet(node, '@iv')
+  if (evNode && evNode.k === 'hash') STAT_KEYS.forEach((k, i) => hashSetKey(evNode, k, int(set.evs[i] ?? 0)))
+  if (ivNode && ivNode.k === 'hash') STAT_KEYS.forEach((k, i) => hashSetKey(ivNode, k, int(set.ivs[i] ?? 31)))
+
+  const movesNode = ivarGet(node, '@moves')
+  if (movesNode && movesNode.k === 'array') {
+    movesNode.items = set.moves.map(mt => buildMoveNode(mt.id, mt.pp ?? 5, getSym))
+  }
+
+  const species = symOrStr(ivarGet(node, '@species')) ?? ''
+  if (set.nature) {
+    ivarSet(node, '@nature', getSym(set.nature))
+    ivarSet(node, '@nature_for_stats', getSym(set.nature))
+  }
+  if (set.item) ivarSet(node, '@item', getSym(set.item))
+  if (set.ability) {
+    const idx = (getAnilSpecies(species)?.abilities ?? []).findIndex(a => a.id === set.ability)
+    ivarSet(node, '@ability', getSym(set.ability))
+    if (idx >= 0) ivarSet(node, '@ability_index', int(idx))
+  }
+
+  const level = asInt(ivarGet(node, '@level')) ?? 100
+  const natureKey = (set.nature ?? symOrStr(ivarGet(node, '@nature_for_stats')) ?? symOrStr(ivarGet(node, '@nature')) ?? 'HARDY').toUpperCase()
+  const stats = calcStats(set.base, set.ivs, set.evs, level, natureKey)
+  ivarSet(node, '@totalhp', int(stats[0]))
+  ivarSet(node, '@hp', int(stats[0]))
+  STAT_IVARS.slice(1).forEach((iv, i) => ivarSet(node, iv, int(stats[i + 1])))
+}
+
+/**
+ * Applies one confirmed set per concrete instance (matched by @personalID, then by box+slot).
+ * Every Pokémon without a draft is left untouched. The output is re-parsed and structurally
+ * diffed against the original: only the whitelisted Pokémon ivars may change.
+ */
+export function applyDraftChanges(bytes: Uint8Array, drafts: readonly DraftLike[]): DraftApplyResult {
+  const originalDoc = load(bytes)
+  const doc = load(bytes)
+  const symTable = new Map<string, MNode>()
+  const getSym = (name: string): MNode => {
+    let s = symTable.get(name)
+    if (!s) { s = symFor(name); symTable.set(name, s) }
+    return s
+  }
+
+  const mons = collectPokemon(doc)
+  const byPid = new Map<number, typeof mons[number]>()
+  const byLoc = new Map<string, typeof mons[number]>()
+  const claimedLoc = new Set<string>()
+  for (const m of mons) {
+    const pid = asInt(ivarGet(m.node, '@personalID'))
+    if (pid != null) byPid.set(pid, m)
+    if (!m.inParty && m.boxIndex != null && m.slot != null) byLoc.set(`box${m.boxIndex}:${m.slot}`, m)
+  }
+
+  const records: DraftChangeRecord[] = []
+  let applied = 0
+
+  for (const draft of drafts) {
+    const pid = pidFromKey(draft.instanceKey)
+    let target = pid != null ? byPid.get(pid) : undefined
+    if (!target) {
+      const loc = locFromKey(draft.instanceKey)
+      if (loc && loc.box != null && loc.slot != null) target = byLoc.get(`box${loc.box}:${loc.slot}`)
+      else if (loc) {
+        target = mons.find(m => m.inParty && !claimedLoc.has('team:' + m.node) && symOrStr(ivarGet(m.node, '@species')) === draft.speciesId)
+        if (target) claimedLoc.add('team:' + target.node)
+      }
+    }
+
+    const base: DraftChangeRecord = {
+      instanceKey: draft.instanceKey,
+      species: draft.speciesId,
+      location: target ? (target.inParty ? 'Equipo' : `${target.boxName} · ${(target.slot ?? 0) + 1}`) : '—',
+      formTo: draft.selectedFormId || 'Forma actual',
+      tier: draft.recommendedSet.tier,
+      applied: false,
+      skippedReason: null
+    }
+
+    if (!target) {
+      base.skippedReason = 'no se encontró el ejemplar en la partida'
+      records.push(base)
+      continue
+    }
+
+    applySetToNode(target.node, draft.recommendedSet, getSym)
+    base.applied = true
+    records.push(base)
+    applied++
+  }
+
+  const output = dump(doc)
+  const reparsed = load(output)
+  const diffs = structuralDiff(originalDoc.root, reparsed.root, true)
+
+  let perInstanceOk = true
+  const checkMons = collectPokemon(reparsed)
+  const checkByPid = new Map<number, typeof checkMons[number]>()
+  for (const m of checkMons) {
+    const pid = asInt(ivarGet(m.node, '@personalID'))
+    if (pid != null) checkByPid.set(pid, m)
+  }
+  for (const draft of drafts) {
+    const pid = pidFromKey(draft.instanceKey)
+    const node = pid != null ? checkByPid.get(pid)?.node : undefined
+    if (!node) continue
+    const ev = STAT_KEYS.map(k => asInt(hashGet(ivarGet(node, '@ev'), k)))
+    const mv = moveIds(ivarGet(node, '@moves'))
+    const evOk = ev.every((v, i) => v === (draft.recommendedSet.evs[i] ?? 0))
+    const mvOk = mv.length === draft.recommendedSet.moves.length && mv.every((id, i) => id === draft.recommendedSet.moves[i].id)
+    if (!(evOk && mvOk)) perInstanceOk = false
+  }
+
+  return {
+    output,
+    applied,
+    records,
+    diffs,
+    verified: diffs.length === 0 && perInstanceOk
+  }
+}
+
 export function downloadBytes(bytes: Uint8Array, filename: string): void {
   const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
   const blob = new Blob([ab], { type: 'application/octet-stream' })

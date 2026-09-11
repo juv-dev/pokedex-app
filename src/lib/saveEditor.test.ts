@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { load, dump, symFor, int, nil, collectPokemon, ivarGet, symOrStr, asInt, hashGet, type MNode } from './marshalCodec.mjs'
-import { applyRecommendedSets } from './saveEditor'
-import { megaOptionsFor } from './recommendedSet'
+import { applyRecommendedSets, applyDraftChanges, type DraftLike } from './saveEditor'
+import { megaOptionsFor, type RecommendedSet } from './recommendedSet'
 
 const STAT_KEYS = ['HP', 'ATTACK', 'DEFENSE', 'SPECIAL_ATTACK', 'SPECIAL_DEFENSE', 'SPEED']
 
@@ -17,12 +17,13 @@ function moveObj(id: string): MNode {
     ivars: [[symFor('@id'), symFor(id)], [symFor('@ppup'), int(0)], [symFor('@pp'), int(15)]]
   } as MNode
 }
-function pokemon(species: string, level: number): MNode {
+function pokemon(species: string, level: number, pid?: number): MNode {
   return {
     k: 'object', cls: 'Pokemon',
     ivars: [
       [symFor('@species'), symFor(species)],
       [symFor('@level'), int(level)],
+      ...(pid != null ? [[symFor('@personalID'), int(pid)]] as Array<[MNode, MNode]> : []),
       [symFor('@nature'), symFor('HARDY')],
       [symFor('@nature_for_stats'), nil()],
       [symFor('@shiny'), { k: 'prim', p: 2 }],
@@ -143,5 +144,80 @@ describe('applyRecommendedSets', () => {
     expect(symOrStr(ivarGet(mon.node, '@nature'))).toBe(rec.natureWanted)
     // other Pokémon keep the base build (no mega)
     expect(res.records.find(r => r.species === 'PIKACHU')!.mega).toBeNull()
+  })
+})
+
+function pidSave(): Uint8Array {
+  const box: MNode = {
+    k: 'object', cls: 'PokemonBox',
+    ivars: [
+      [symFor('@name'), strNode('Caja 1')],
+      [symFor('@pokemon'), { k: 'array', items: [pokemon('LEDIAN', 50, 111), nil(), pokemon('LEDIAN', 50, 222)] }]
+    ]
+  } as MNode
+  const storage: MNode = { k: 'object', cls: 'PokemonStorage', ivars: [[symFor('@boxes'), { k: 'array', items: [box] }]] } as MNode
+  const player: MNode = { k: 'object', cls: 'Player', ivars: [[symFor('@party'), { k: 'array', items: [pokemon('GARCHOMP', 60, 333)] }]] } as MNode
+  const root: MNode = { k: 'hash', pairs: [[symFor('player'), player], [symFor('storage'), storage]] } as MNode
+  return dump({ major: 4, minor: 8, root })
+}
+
+function draftFor(instanceKey: string, speciesId: string, over: Partial<RecommendedSet> = {}): DraftLike {
+  return {
+    instanceKey,
+    speciesId,
+    selectedFormId: over.megaFormName ?? '',
+    recommendedSet: {
+      source: 'heuristic', tier: 'viable', referenceFrom: null, megaFormName: null,
+      base: [40, 35, 50, 55, 110, 85],
+      evs: [4, 0, 0, 0, 252, 252], ivs: [31, 31, 31, 31, 31, 31],
+      moves: [{ id: 'SWORDSDANCE', pp: 20 }, { id: 'MACHPUNCH', pp: 30 }, { id: 'KNOCKOFF', pp: 20 }, { id: 'DUALWINGBEAT', pp: 10 }],
+      nature: 'JOLLY', item: 'LIFEORB', ability: 'SWARM', ...over
+    }
+  }
+}
+
+describe('applyDraftChanges', () => {
+  it('should apply one set per instance matched by @personalID and verify clean', () => {
+    const res = applyDraftChanges(pidSave(), [draftFor('pid:111', 'LEDIAN')])
+    expect(res.applied).toBe(1)
+    expect(res.diffs).toEqual([])
+    expect(res.verified).toBe(true)
+    expect(res.records[0].applied).toBe(true)
+  })
+
+  it('should touch only the targeted instance, leaving its same-species sibling untouched', () => {
+    const original = pidSave()
+    const res = applyDraftChanges(original, [draftFor('pid:111', 'LEDIAN')])
+    const mons = collectPokemon(load(res.output))
+    const byPid = (p: number) => mons.find(m => asInt(ivarGet(m.node, '@personalID')) === p)!
+
+    const changed = byPid(111)
+    expect(STAT_KEYS.map(k => asInt(hashGet(ivarGet(changed.node, '@ev'), k)))).toEqual([4, 0, 0, 0, 252, 252])
+    const changedMoves = (ivarGet(changed.node, '@moves') as unknown as { items: MNode[] }).items.map(x => symOrStr(ivarGet(x, '@id')))
+    expect(changedMoves).toEqual(['SWORDSDANCE', 'MACHPUNCH', 'KNOCKOFF', 'DUALWINGBEAT'])
+
+    const untouched = byPid(222)
+    expect(STAT_KEYS.map(k => asInt(hashGet(ivarGet(untouched.node, '@ev'), k)))).toEqual([0, 0, 0, 0, 0, 0])
+    const untouchedMoves = (ivarGet(untouched.node, '@moves') as unknown as { items: MNode[] }).items.map(x => symOrStr(ivarGet(x, '@id')))
+    expect(untouchedMoves).toEqual(['TACKLE', 'GROWL'])
+  })
+
+  it('should reopen the produced save and re-serialise it identically', () => {
+    const res = applyDraftChanges(pidSave(), [draftFor('pid:111', 'LEDIAN'), draftFor('pid:333', 'GARCHOMP')])
+    const again = dump(load(res.output))
+    expect([...again]).toEqual([...res.output])
+  })
+
+  it('should fall back to box+slot when the key carries no personal id', () => {
+    const res = applyDraftChanges(pidSave(), [draftFor('loc:box0:2:LEDIAN', 'LEDIAN')])
+    expect(res.applied).toBe(1)
+    expect(res.verified).toBe(true)
+  })
+
+  it('should record a skip when the instance is not in the save', () => {
+    const res = applyDraftChanges(pidSave(), [draftFor('pid:999', 'LEDIAN')])
+    expect(res.applied).toBe(0)
+    expect(res.records[0].applied).toBe(false)
+    expect(res.records[0].skippedReason).toMatch(/no se encontr/i)
   })
 })

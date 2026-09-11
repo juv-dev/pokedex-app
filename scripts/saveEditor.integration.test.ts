@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { load, dump, collectPokemon, ivarGet, symOrStr, asInt, hashGet } from '../src/lib/marshalCodec.mjs'
-import { applyRecommendedSets } from '../src/lib/saveEditor'
+import { applyRecommendedSets, applyDraftChanges, type DraftLike } from '../src/lib/saveEditor'
+import { recommendedSetFor } from '../src/lib/recommendedSet'
 
 const SAVE = 'C:/Users/jesus/AppData/Roaming/Pokemon Anil/Partida 1.rxdata'
 const STAT_KEYS = ['HP', 'ATTACK', 'DEFENSE', 'SPECIAL_ATTACK', 'SPECIAL_DEFENSE', 'SPEED']
@@ -62,5 +63,55 @@ describe.skipIf(!existsSync(SAVE))('applyRecommendedSets (real save)', () => {
     const opt = await applyRecommendedSets(bytes(), { includeNatureItemAbility: false, onlyOptimo: true })
     expect(opt.totals.applied).toBeLessThan(all.totals.applied)
     expect(opt.verified).toBe(true)
+  })
+})
+
+describe.skipIf(!existsSync(SAVE))('applyDraftChanges (real save)', () => {
+  async function drafts(count: number): Promise<{ list: DraftLike[]; pids: number[] }> {
+    const mons = collectPokemon(load(bytes()))
+      .filter(m => asInt(ivarGet(m.node, '@personalID')) != null)
+      .slice(0, count)
+    const list: DraftLike[] = []
+    const pids: number[] = []
+    for (const m of mons) {
+      const species = symOrStr(ivarGet(m.node, '@species'))!
+      const set = await recommendedSetFor(species)
+      if (!set) continue
+      const pid = asInt(ivarGet(m.node, '@personalID'))!
+      pids.push(pid)
+      list.push({ instanceKey: `pid:${pid}`, speciesId: species, selectedFormId: '', recommendedSet: set })
+    }
+    return { list, pids }
+  }
+
+  it('should change only the targeted instances and pass verification', async () => {
+    const { list, pids } = await drafts(4)
+    const res = applyDraftChanges(bytes(), list)
+    expect(res.applied).toBe(list.length)
+    expect(res.diffs).toEqual([])
+    expect(res.verified).toBe(true)
+
+    const before = collectPokemon(load(bytes()))
+    const after = collectPokemon(load(res.output))
+    const evOf = (mons: typeof after, pid: number) => {
+      const node = mons.find(m => asInt(ivarGet(m.node, '@personalID')) === pid)!.node
+      return STAT_KEYS.map(k => asInt(hashGet(ivarGet(node, '@ev'), k)))
+    }
+    for (const pid of pids) {
+      const draft = list.find(d => d.instanceKey === `pid:${pid}`)!
+      expect(evOf(after, pid)).toEqual(draft.recommendedSet.evs.slice(0, 6))
+    }
+    // an untouched Pokémon keeps its original EVs
+    const untouchedPid = after
+      .map(m => asInt(ivarGet(m.node, '@personalID')))
+      .find(p => p != null && !pids.includes(p))!
+    expect(evOf(after, untouchedPid)).toEqual(evOf(before, untouchedPid))
+  })
+
+  it('should reopen the produced save and re-serialise it identically', async () => {
+    const { list } = await drafts(3)
+    const res = applyDraftChanges(bytes(), list)
+    const again = dump(load(res.output))
+    expect(Buffer.compare(Buffer.from(again), Buffer.from(res.output))).toBe(0)
   })
 })
