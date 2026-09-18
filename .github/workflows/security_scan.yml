@@ -1,0 +1,30 @@
+name: Security Scan
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  vulnerability-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: juv-dev/workflows-frontend/.github/actions/vulnerability-scan@main
+
+  supply-chain:
+    needs: vulnerability-scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: juv-dev/workflows-frontend/.github/actions/supply-chain@main
