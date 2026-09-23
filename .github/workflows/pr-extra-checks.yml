@@ -1,0 +1,35 @@
+name: Workflow PR Extra Checks
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  no-ai-artifacts:
+    name: no-ai-artifacts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: juv-dev/workflows-frontend/.github/actions/no-ai-artifacts@main
+
+  load-values:
+    name: load-values
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.values.outputs.version }}
+      name: ${{ steps.values.outputs.name }}
+    steps:
+      - uses: juv-dev/workflows-frontend/.github/actions/load-values@main
+        id: values
+
+  validate-tag:
+    name: validate-tag
+    needs: load-values
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: juv-dev/workflows-frontend/.github/actions/validate-tag@main
